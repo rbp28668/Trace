@@ -18,20 +18,28 @@ public class PlannerArgs
     public double WindDirection { get; init; }
     public double VRefCru { get; init; } = 130.0;
     public double? ReferenceHandicap { get; init; }
+    public IReadOnlyList<string> AirspacePaths { get; init; } = Array.Empty<string>();
+    public double MaxZoneHeightFt { get; init; } = 10000.0;
 
     public const string Usage =
         "Usage: Trace.Planner --fleet <fleet.csv> --course <course.cup> --wind <dir>/<speed>\n" +
-        "                     [--vref <kmh>] [--href <handicap>] --out <dir>\n" +
+        "                     [--vref <kmh>] [--href <handicap>]\n" +
+        "                     [--airspace <a.txt,b.txt>] [--max-height <ft>] --out <dir>\n" +
         "\n" +
         "  --wind 270/30   wind FROM 270° true at 30 km/h\n" +
         "  --vref 130      cruise airspeed of a notional H=100 glider (km/h, default 130)\n" +
-        "  --href 120      reference handicap (default: highest in fleet)";
+        "  --href 120      reference handicap (default: highest in fleet)\n" +
+        "  --airspace      comma-separated OpenAir files; barrels intersecting\n" +
+        "                  controlled airspace are a hard error (dht.md §5.2)\n" +
+        "  --max-height    zone ceiling in ft for airspace checks (default 10000)";
 
     public static PlannerArgs Parse(string[] args)
     {
         string? fleet = null, course = null, outDir = null, wind = null;
         double vref = 130.0;
         double? href = null;
+        var airspace = new List<string>();
+        double maxHeight = 10000.0;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -44,6 +52,11 @@ public class PlannerArgs
                 case "--wind": wind = Next(args, ref i, a); break;
                 case "--vref": vref = ParseDouble(Next(args, ref i, a), a); break;
                 case "--href": href = ParseDouble(Next(args, ref i, a), a); break;
+                case "--airspace":
+                    airspace.AddRange(Next(args, ref i, a)
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                    break;
+                case "--max-height": maxHeight = ParseDouble(Next(args, ref i, a), a); break;
                 default:
                     throw new PlannerArgsException($"Unknown argument: {a}");
             }
@@ -64,6 +77,8 @@ public class PlannerArgs
             WindSpeed = speed,
             VRefCru = vref,
             ReferenceHandicap = href,
+            AirspacePaths = airspace,
+            MaxZoneHeightFt = maxHeight,
         };
     }
 

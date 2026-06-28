@@ -34,6 +34,25 @@ public static class ScoreReport
         os.WriteLine();
     }
 
+    public static void PrintInfringements(TextWriter os, IReadOnlyList<InfringementScan.Infringement> infringements)
+    {
+        if (infringements.Count == 0)
+        {
+            os.WriteLine("  Airspace: no infringements.");
+        }
+        else
+        {
+            os.WriteLine($"  Airspace: {infringements.Count} infringement(s):");
+            foreach (InfringementScan.Infringement inf in infringements)
+            {
+                os.WriteLine($"    {inf.AirspaceClass} {inf.AirspaceName}: " +
+                    $"{inf.Enter:HH:mm:ss}–{inf.Exit:HH:mm:ss} ({inf.FixCount} fixes)");
+            }
+        }
+
+        os.WriteLine();
+    }
+
     private static string Format(TimeSpan t)
         => $"{(int)t.TotalHours:D2}:{t.Minutes:D2}:{t.Seconds:D2}";
 }

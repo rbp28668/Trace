@@ -17,16 +17,19 @@ public class ScorerArgs
     public double ReferenceDistanceKm { get; init; }
     public double ReferenceHandicap { get; init; } = 100.0;
     public double Handicap { get; init; } = 100.0;
+    public IReadOnlyList<string> AirspacePaths { get; init; } = Array.Empty<string>();
 
     public const string Usage =
         "Usage: Trace.Scorer --task <task.cup> --igc <flight.igc> [--igc ...]\n" +
         "                    [--dref <km>] [--href <handicap>] [--handicap <H>]\n" +
+        "                    [--airspace <a.txt,b.txt>]\n" +
         "       Trace.Scorer --dump <flight.igc> [<flight.igc> ...]\n" +
         "\n" +
         "  --task     personalised task .cup file (with barrel radii)\n" +
         "  --dref     reference distance D_Ref in km (for finisher scoring speed)\n" +
         "  --href     reference handicap H_Ref (default 100)\n" +
         "  --handicap this pilot's handicap H (default 100)\n" +
+        "  --airspace comma-separated OpenAir files; scan the trace for infringements\n" +
         "  --dump     print the IGC summary instead of scoring";
 
     public static ScorerArgs Parse(string[] args)
@@ -35,6 +38,7 @@ public class ScorerArgs
         string? task = null;
         var igc = new List<string>();
         double dref = 0.0, href = 100.0, handicap = 100.0;
+        var airspace = new List<string>();
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -47,6 +51,10 @@ public class ScorerArgs
                 case "--dref": dref = ParseDouble(Next(args, ref i, a), a); break;
                 case "--href": href = ParseDouble(Next(args, ref i, a), a); break;
                 case "--handicap": handicap = ParseDouble(Next(args, ref i, a), a); break;
+                case "--airspace":
+                    airspace.AddRange(Next(args, ref i, a)
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                    break;
                 default:
                     if (a.StartsWith('-'))
                     {
@@ -77,6 +85,7 @@ public class ScorerArgs
             ReferenceDistanceKm = dref,
             ReferenceHandicap = href,
             Handicap = handicap,
+            AirspacePaths = airspace,
         };
     }
 

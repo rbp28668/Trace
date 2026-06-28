@@ -9,6 +9,7 @@
 // --dump it prints the legacy IGC summary instead.
 
 using Trace;
+using Trace.Airspace;
 using Trace.Scorer;
 using Trace.Scoring;
 
@@ -23,7 +24,10 @@ try
 
     ScoringTask task = ScoringTask.FromCup(parsed.TaskPath!);
 
-    int exit = 0;
+    AirspaceChecker? checker = parsed.AirspacePaths.Count > 0
+        ? AirspaceLoader.Load(parsed.AirspacePaths)
+        : null;
+
     foreach (string igcPath in parsed.IgcPaths)
     {
         var igc = new IGCFile();
@@ -38,9 +42,16 @@ try
         ScoreResult result = engine.Score(task, igc.Trace);
 
         ScoreReport.Print(Console.Out, igcPath, igc, task, result);
+
+        if (checker != null)
+        {
+            IReadOnlyList<InfringementScan.Infringement> infringements =
+                InfringementScan.Scan(checker, igc.Trace, AirspaceLoader.ControlledClasses);
+            ScoreReport.PrintInfringements(Console.Out, infringements);
+        }
     }
 
-    return exit;
+    return 0;
 }
 catch (ScorerArgsException e)
 {

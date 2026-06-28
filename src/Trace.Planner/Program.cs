@@ -6,6 +6,7 @@
 //
 // Emits one standard .CUP task file per handicap plus a summary report.
 
+using Trace.Airspace;
 using Trace.Io;
 using Trace.Model;
 using Trace.Planning;
@@ -28,9 +29,33 @@ try
     };
     FleetPlan plan = optimizer.Optimize(course, geometry, fleet, href);
 
+    PlanReport.Print(Console.Out, course, plan, parsed);
+
+    // Airspace guardrail (dht.md §5.2): block publication if any barrel
+    // penetrates controlled airspace.
+    if (parsed.AirspacePaths.Count > 0)
+    {
+        AirspaceChecker checker = AirspaceLoader.Load(parsed.AirspacePaths);
+        IReadOnlyList<AirspaceGuard.Violation> violations =
+            AirspaceGuard.Check(course, plan, checker, parsed.MaxZoneHeightFt);
+
+        if (violations.Count > 0)
+        {
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("AIRSPACE VIOLATION — task NOT published:");
+            foreach (AirspaceGuard.Violation v in violations)
+            {
+                Console.Error.WriteLine(
+                    $"  {v.CompNumber}: barrel at {v.PointName} ({v.RadiusKm:F1} km) " +
+                    $"intersects {v.AirspaceClass} {v.AirspaceName}");
+            }
+
+            return 3;
+        }
+    }
+
     Directory.CreateDirectory(parsed.OutDir);
     PlanWriter.WriteAll(parsed.OutDir, course, plan);
-    PlanReport.Print(Console.Out, course, plan, parsed);
 
     return 0;
 }
