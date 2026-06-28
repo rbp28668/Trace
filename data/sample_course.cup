@@ -1,0 +1,11 @@
+name,code,country,lat,lon,elev,style,rwdir,rwlen,rwwidth,freq,desc,userdata,pics
+"Lasham","LAS",UK,5111.250N,00101.917W,186m,4,,,,,"Start",,
+"Membury","MEM",UK,5128.000N,00131.000W,230m,1,,,,,"TP1",,
+"Didcot","DID",UK,5136.500N,00115.300W,90m,1,,,,,"TP2",,
+"Lasham","LAS",UK,5111.250N,00101.917W,186m,4,,,,,"Finish",,
+-----Related Tasks-----
+"Sample Triangle","Lasham","Membury","Didcot","Lasham"
+ObsZone=0,Style=2,R1=5000m,A1=90,Line=1
+ObsZone=1,Style=1,R1=500m,A1=180
+ObsZone=2,Style=1,R1=500m,A1=180
+ObsZone=3,Style=1,R1=3000m,A1=180
