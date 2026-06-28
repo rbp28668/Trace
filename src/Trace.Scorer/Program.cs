@@ -1,60 +1,56 @@
+// Trace.Scorer — DHT flight scoring engine (docs/implementation-plan.md §5).
+//
+// Usage:
+//   Trace.Scorer --task <task_h93.cup> --igc <flight.igc> [--igc ...]
+//                [--dref <km>] [--href <handicap>] [--handicap <H>]
+//   Trace.Scorer --dump <flight.igc> [<flight.igc> ...]
+//
+// Scores each IGC trace against the personalised task (dht.md §4.2). With
+// --dump it prints the legacy IGC summary instead.
+
 using Trace;
+using Trace.Scorer;
+using Trace.Scoring;
 
-int exitCode = 0;
-
-foreach (string arg in args)
+try
 {
-    if (arg.StartsWith('-') || arg.StartsWith('/'))
+    ScorerArgs parsed = ScorerArgs.Parse(args);
+
+    if (parsed.Dump)
     {
-        // Option flag — none defined yet.
-        Console.Error.WriteLine($"Unknown option: {arg}");
-        exitCode = 1;
-        continue;
+        return IgcDump.Run(parsed.IgcPaths);
     }
 
-    if (!File.Exists(arg))
-    {
-        Console.Error.WriteLine($"File not found: {arg}");
-        exitCode = 1;
-        continue;
-    }
+    ScoringTask task = ScoringTask.FromCup(parsed.TaskPath!);
 
-    try
+    int exit = 0;
+    foreach (string igcPath in parsed.IgcPaths)
     {
         var igc = new IGCFile();
-        igc.Parse(arg);
+        igc.Parse(igcPath);
 
-        Console.WriteLine($"{arg}");
-        Console.WriteLine($"  Glider:      {igc.GliderType} ({igc.Registration})");
-        Console.WriteLine($"  Pilot:       {igc.P1}");
-        Console.WriteLine($"  Date:        {igc.Date:yyyy-MM-dd}");
-        Console.WriteLine($"  Trace points: {igc.Trace.Count}");
+        var engine = new ScoringEngine
+        {
+            ReferenceDistanceKm = parsed.ReferenceDistanceKm,
+            ReferenceHandicap = parsed.ReferenceHandicap,
+            Handicap = parsed.Handicap,
+        };
+        ScoreResult result = engine.Score(task, igc.Trace);
 
-        if (igc.Task is { } task)
-        {
-            Console.WriteLine($"  Task:        #{task.TaskNumber}, {task.Points.Count} waypoint(s)" +
-                (string.IsNullOrEmpty(task.Description) ? "" : $" — {task.Description}"));
-            foreach (TaskPoint point in task.Points)
-            {
-                Console.WriteLine($"    {point.Northings,10:F5}, {point.Eastings,10:F5}  {point.Name}");
-            }
-        }
-        else
-        {
-            Console.WriteLine("  Task:        (none declared)");
-        }
+        ScoreReport.Print(Console.Out, igcPath, igc, task, result);
     }
-    catch (Exception e)
-    {
-        Console.Error.WriteLine($"Error reading {arg}: {e.Message}");
-        exitCode = 1;
-    }
+
+    return exit;
 }
-
-if (args.Length == 0)
+catch (ScorerArgsException e)
 {
-    Console.Error.WriteLine("Usage: Trace [options] <file.igc> [<file.igc> ...]");
-    exitCode = 1;
+    Console.Error.WriteLine(e.Message);
+    Console.Error.WriteLine();
+    Console.Error.WriteLine(ScorerArgs.Usage);
+    return 2;
 }
-
-return exitCode;
+catch (Exception e)
+{
+    Console.Error.WriteLine($"Error: {e.Message}");
+    return 1;
+}
