@@ -1,0 +1,15 @@
+name,code,country,lat,lon,elev,style,rwdir,rwlen,rwwidth,freq,desc,userdata,pics
+"Earith",EAR,UK,5221.227N,00002.265E,14.0m,1,,,,,"Turn Point, A1123/River Br, W of two river bridges on E side of village. Difficult to find.",,
+"Edgehill",EDG,UK,5205.097N,00128.418W,195.0m,4,0,0.0m,,"129.980","Turn Point, Centre of airfield, Site of Edgehill GC, #. Easy to find and on chart.",,
+"Gransden Lodge",GRL,UK,5211.179N,00006.674W,77.0m,4,0,0.0m,,"131.280","Turn Point, Clubhouse, N side of Cambridge GC site. Avoid Fuller's Hill grass airfield [Little Gransden' on ICAO map] 1 NMl SW with light aircraft & microlights, including aerobatics., #. Local knowledge required.",,
+"Hardwick",HDW,UK,5213.216N,00000.022E,63.0m,1,,,,,"Turn Point, A428 Bridge, Minor road over A428 between Hardwick and Highfields. Difficult to find.",,
+"Rushden",RUS,UK,5219.458N,00035.905W,68.0m,1,,,,,"Turn Point, A6/River Bridge, Over River Nene 2 NMl N of Town. Easy to find and on chart.",,
+-----Related Tasks-----
+,"???","Gransden Lodge","Edgehill","Earith","Rushden","Hardwick","Gransden Lodge","???"
+Options,NearAlt=656.0ft
+ObsZone=0,Style=2,SpeedStyle=0,R1=5000m,A1=45,R2=0m,A2=0,MaxAlt=0.0ft,Line=1
+ObsZone=1,Style=1,SpeedStyle=1,R1=10000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=2,Style=1,SpeedStyle=1,R1=10000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=3,Style=1,SpeedStyle=1,R1=10000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=4,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=5,Style=3,SpeedStyle=2,R1=3000m,A1=180,R2=0m,A2=0,MaxAlt=0.0ft
