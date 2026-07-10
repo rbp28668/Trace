@@ -85,8 +85,9 @@ public static class CourseReader
             bool isFinish = i == names.Count - 1;
             zonesByIndex.TryGetValue(i, out ObservationZone? zone);
 
-            // Radius comes from the file's ObsZone when present, else a role default.
-            double radius = zone?.R1Metres / 1000.0 ?? (isStart ? DefaultStartRadiusKm
+            // Radius comes from the file's ObsZone barrel when present, else a role
+            // default. The DHT engine sizes the barrel (R2, or R1 for a cylinder).
+            double radius = zone?.BarrelRadiusMetres / 1000.0 ?? (isStart ? DefaultStartRadiusKm
                 : isFinish ? DefaultFinishRadiusKm
                 : DefaultTurnpointRadiusKm);
 

@@ -3,9 +3,25 @@ using Trace.Model;
 
 namespace Trace.Scoring;
 
-/// <summary>One point of a task being scored: its centre and observation radius.</summary>
+/// <summary>
+/// One point of a task being scored: its centre, the DHT barrel and the wider
+/// observation sector.
+/// </summary>
+/// <param name="RadiusKm">The DHT barrel radius (km): a full circle used for the distance calculation.</param>
+/// <param name="SectorRadiusKm">The observation sector's outer radius (km); equals the barrel for a plain cylinder.</param>
+/// <param name="SectorHalfAngleDeg">
+/// Half-angle of the observation sector either side of its direction (180 = full circle).
+/// </param>
+/// <param name="Style">Sector orientation (symmetric bisector, to next/previous/start, or fixed).</param>
+/// <param name="IsLine">
+/// True when the zone is a start/finish line (crossed within <c>RadiusKm</c> as a
+/// half-width) rather than a cylinder. A line start is timed at the crossing, not
+/// at the cylinder boundary.
+/// </param>
 public readonly record struct ScoringPoint(
-    string Name, double Latitude, double Longitude, CoursePointType Type, double RadiusKm);
+    string Name, double Latitude, double Longitude, CoursePointType Type, double RadiusKm,
+    bool IsLine = false, double SectorRadiusKm = 0.0, double SectorHalfAngleDeg = 180.0,
+    ZoneStyle Style = ZoneStyle.Symmetrical);
 
 /// <summary>
 /// A task as flown for scoring (dht.md §4.2): the ordered points with the actual
@@ -76,15 +92,18 @@ public class ScoringTask
             bool isStart = i == 0;
             bool isFinish = i == names.Count - 1;
             zonesByIndex.TryGetValue(i, out ObservationZone? z);
-            double radiusKm = z?.R1Metres / 1000.0 ?? 0.5;
+            double barrelKm = z?.BarrelRadiusMetres / 1000.0 ?? 0.5;
+            double sectorKm = z?.SectorRadiusMetres / 1000.0 ?? barrelKm;
+            double sectorAngle = z?.SectorHalfAngleDegrees ?? 180.0;
 
             CoursePointType type = isStart ? CoursePointType.Start
                 : isFinish ? CoursePointType.Finish
-                : z != null && radiusKm < CourseReader.VariableBarrelThresholdKm
+                : z != null && barrelKm < CourseReader.VariableBarrelThresholdKm
                     ? CoursePointType.Checkpoint
                     : CoursePointType.Turnpoint;
 
-            points.Add(new ScoringPoint(wp.Name, wp.Latitude, wp.Longitude, type, radiusKm));
+            points.Add(new ScoringPoint(wp.Name, wp.Latitude, wp.Longitude, type, barrelKm,
+                z?.IsLine ?? false, sectorKm, sectorAngle, z?.Style ?? ZoneStyle.Symmetrical));
         }
 
         return new ScoringTask(points, task.Description);

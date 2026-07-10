@@ -66,7 +66,7 @@ public static class PlanWriter
                 }
 
                 zones.Add(p.Type == CoursePointType.Turnpoint
-                    ? p.SourceZone.WithR1(plan.RadiiKm[i] * 1000.0)
+                    ? p.SourceZone.WithBarrel(plan.RadiiKm[i] * 1000.0)
                     : p.SourceZone);
             }
 

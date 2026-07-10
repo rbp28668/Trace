@@ -55,9 +55,18 @@ public class ScoringEngine
     {
         IReadOnlyList<ScoringPoint> pts = task.Points;
 
-        // 1. Find start: the last fix inside the start zone before leaving it
-        //    heading onto the course. We take the first exit from the start zone.
-        int startFixIndex = FindStartExit(pts[0], trace);
+        // 1. Find start: the pilot may loiter in and out of the start zone during
+        //    the pre-start climb, so the valid start is the LAST departure from the
+        //    start before heading out on course. Anchor on the first arrival at the
+        //    first turnpoint (far from the start) and take the last start crossing
+        //    before it; this also avoids the return-to-start finish (start and
+        //    finish often share an airfield). A line start is timed at the line
+        //    crossing; a cylinder start at the zone exit.
+        int firstTpEntry = pts.Count > 1 ? FindZoneEntry(pts[1], trace, 0, ZoneDirection(pts, 1)) : -1;
+        ScoringPoint startPoint = pts[0];
+        int startFixIndex = startPoint.IsLine && pts.Count > 1
+            ? FindStartLineCrossing(startPoint, pts[1], trace, firstTpEntry)
+            : FindStartExit(startPoint, trace, firstTpEntry);
         if (startFixIndex < 0)
         {
             return new ScoreResult { Outcome = ScoreOutcome.DidNotStart };
@@ -65,17 +74,21 @@ public class ScoringEngine
 
         DateTime startTime = trace[startFixIndex].When;
 
-        // 2. Walk the trace, capturing each subsequent zone entry in order.
+        // 2. Walk the trace, capturing each zone entry IN ORDER: each point is
+        //    searched only from the fix that achieved the previous point onward
+        //    (searchFrom = entry). A point reached out of sequence does not count —
+        //    e.g. entering Northampton South's sector before Rushden's earns no
+        //    credit for Rushden. This matters because the wide sectors overlap.
         int achieved = 0;          // last achieved point index (start = 0)
         DateTime finishTime = startTime;
         int searchFrom = startFixIndex;
 
         for (int p = 1; p < pts.Count; p++)
         {
-            int entry = FindZoneEntry(pts[p], trace, searchFrom);
+            int entry = FindZoneEntry(pts[p], trace, searchFrom, ZoneDirection(pts, p));
             if (entry < 0)
             {
-                break; // did not reach this point
+                break; // did not reach this point (in order)
             }
 
             achieved = p;
@@ -116,14 +129,20 @@ public class ScoringEngine
         => Geodesy.DistanceKm(p.Latitude, p.Longitude, fix.Northings, fix.Eastings);
 
     /// <summary>
-    /// First fix at which the trace leaves the start zone (was inside, then
-    /// outside). Returns the last in-zone fix index (the start moment), or the
-    /// first fix if the trace never registers inside the start zone.
+    /// Index of the last fix inside the start zone before the trace leaves it for
+    /// the final time ahead of committing to the course. Only exits before
+    /// <paramref name="beforeIndex"/> (the first-turnpoint arrival) count, so
+    /// pre-start climbing in and out of the zone is ignored and the last genuine
+    /// exit is taken as the start moment. <paramref name="beforeIndex"/> &lt; 0
+    /// (no turnpoint reached) falls back to the whole trace. Returns the first fix
+    /// if the trace never registers inside the start zone, or -1 if empty.
     /// </summary>
-    private static int FindStartExit(ScoringPoint start, IReadOnlyList<TracePoint> trace)
+    private static int FindStartExit(ScoringPoint start, IReadOnlyList<TracePoint> trace, int beforeIndex)
     {
+        int limit = beforeIndex >= 0 ? beforeIndex : trace.Count;
+        int lastExit = -1;
         bool wasInside = false;
-        for (int i = 0; i < trace.Count; i++)
+        for (int i = 0; i < limit; i++)
         {
             bool inside = DistanceKm(start, trace[i]) <= start.RadiusKm;
             if (inside)
@@ -132,25 +151,166 @@ public class ScoringEngine
             }
             else if (wasInside)
             {
-                return i - 1; // last fix inside the zone = start time
+                lastExit = i - 1; // last in-zone fix before this exit
+                wasInside = false;
             }
+        }
+
+        if (lastExit >= 0)
+        {
+            return lastExit;
         }
 
         return trace.Count > 0 ? 0 : -1;
     }
 
-    /// <summary>First fix at or after <paramref name="from"/> inside the point's zone.</summary>
-    private static int FindZoneEntry(ScoringPoint point, IReadOnlyList<TracePoint> trace, int from)
+    /// <summary>
+    /// Index of the last fix before the trace crosses the start line heading onto
+    /// course, considering only fixes before <paramref name="beforeIndex"/>. The
+    /// start line passes through the start point perpendicular to the course to the
+    /// next point (<paramref name="next"/>); a crossing is a fix pair whose
+    /// along-course position steps from at/behind the line to ahead of it, within
+    /// the line half-width (<see cref="ScoringPoint.RadiusKm"/>). Returns the fix on
+    /// the behind side (the start moment), or -1 if no valid crossing is found.
+    /// </summary>
+    private static int FindStartLineCrossing(ScoringPoint start, ScoringPoint next,
+        IReadOnlyList<TracePoint> trace, int beforeIndex)
+    {
+        int limit = beforeIndex >= 0 ? beforeIndex : trace.Count;
+        double course = Geodesy.BearingDegrees(start.Latitude, start.Longitude,
+            next.Latitude, next.Longitude);
+
+        int lastCrossing = -1;
+        double prevAlong = double.NaN;
+        for (int i = 0; i < limit; i++)
+        {
+            (double along, double across) = Project(start, course, trace[i]);
+            if (!double.IsNaN(prevAlong) && prevAlong <= 0 && along > 0 &&
+                Math.Abs(across) <= start.RadiusKm)
+            {
+                lastCrossing = i - 1; // last fix on the pre-start side
+            }
+
+            prevAlong = along;
+        }
+
+        return lastCrossing;
+    }
+
+    /// <summary>
+    /// Projects a fix onto the start-line frame: distance along the course
+    /// direction (positive = past the line, onto course) and across it (absolute
+    /// offset from the line centre), both in km.
+    /// </summary>
+    private static (double Along, double Across) Project(ScoringPoint start, double courseDeg, TracePoint fix)
+    {
+        double d = Geodesy.DistanceKm(start.Latitude, start.Longitude, fix.Northings, fix.Eastings);
+        double bearing = Geodesy.BearingDegrees(start.Latitude, start.Longitude, fix.Northings, fix.Eastings);
+        double delta = (bearing - courseDeg) * Math.PI / 180.0;
+        return (d * Math.Cos(delta), d * Math.Sin(delta));
+    }
+
+    /// <summary>
+    /// First fix at or after <paramref name="from"/> inside the point's observation
+    /// zone: within the barrel circle, or within the wider sector (radius plus
+    /// half-angle about <paramref name="zoneDirDeg"/>). A full-circle sector
+    /// (half-angle ≥ 180°) reduces to a plain radius test.
+    /// </summary>
+    private static int FindZoneEntry(ScoringPoint point, IReadOnlyList<TracePoint> trace, int from,
+        double zoneDirDeg)
     {
         for (int i = from; i < trace.Count; i++)
         {
-            if (DistanceKm(point, trace[i]) <= point.RadiusKm)
+            if (InZone(point, trace[i], zoneDirDeg))
             {
                 return i;
             }
         }
 
         return -1;
+    }
+
+    /// <summary>
+    /// True if the fix lies in the point's observation zone: inside the barrel
+    /// circle, or inside the sector (within the sector radius and within the
+    /// half-angle either side of <paramref name="zoneDirDeg"/>).
+    /// </summary>
+    private static bool InZone(ScoringPoint point, TracePoint fix, double zoneDirDeg)
+    {
+        double d = DistanceKm(point, fix);
+        if (d <= point.RadiusKm)
+        {
+            return true; // inside the barrel (full circle)
+        }
+
+        double sector = point.SectorRadiusKm > 0.0 ? point.SectorRadiusKm : point.RadiusKm;
+        if (d > sector)
+        {
+            return false;
+        }
+
+        if (point.SectorHalfAngleDeg >= 180.0)
+        {
+            return true; // full-circle sector
+        }
+
+        double bearing = Geodesy.BearingDegrees(point.Latitude, point.Longitude, fix.Northings, fix.Eastings);
+        double diff = Math.Abs(((bearing - zoneDirDeg + 540.0) % 360.0) - 180.0);
+        return diff <= point.SectorHalfAngleDeg;
+    }
+
+    /// <summary>
+    /// Direction (deg true) the observation sector at point <paramref name="i"/>
+    /// faces, per its <see cref="ZoneStyle"/>. A symmetric sector opens OUTWARD,
+    /// away from the incoming and outgoing legs (the SeeYou convention): its
+    /// direction is the reverse of the bisector of the bearings to the neighbours.
+    /// Directional styles face the relevant neighbour. Returns 0 for a full-circle
+    /// zone (direction unused).
+    /// </summary>
+    private static double ZoneDirection(IReadOnlyList<ScoringPoint> pts, int i)
+    {
+        ScoringPoint p = pts[i];
+        double? toPrev = i > 0
+            ? Geodesy.BearingDegrees(p.Latitude, p.Longitude, pts[i - 1].Latitude, pts[i - 1].Longitude)
+            : null; // bearing FROM the point toward the previous point
+        double? toNext = i < pts.Count - 1
+            ? Geodesy.BearingDegrees(p.Latitude, p.Longitude, pts[i + 1].Latitude, pts[i + 1].Longitude)
+            : null; // bearing FROM the point toward the next point
+
+        switch (p.Style)
+        {
+            case ZoneStyle.ToNext:
+                return toNext ?? toPrev ?? 0.0;
+            case ZoneStyle.ToPrevious:
+                return toPrev ?? toNext ?? 0.0;
+            case ZoneStyle.ToStart:
+                return Geodesy.BearingDegrees(p.Latitude, p.Longitude, pts[0].Latitude, pts[0].Longitude);
+            case ZoneStyle.Symmetrical:
+            default:
+                if (toPrev is double a && toNext is double b)
+                {
+                    // Sector opens away from both legs: reverse the bisector of the
+                    // bearings toward the two neighbours.
+                    return Geodesy.Normalize360(Bisector(a, b) + 180.0);
+                }
+
+                return toPrev ?? toNext ?? 0.0;
+        }
+    }
+
+    /// <summary>Angular bisector (deg true) of two bearings.</summary>
+    private static double Bisector(double a, double b)
+    {
+        double ar = a * Math.PI / 180.0;
+        double br = b * Math.PI / 180.0;
+        double x = Math.Cos(ar) + Math.Cos(br);
+        double y = Math.Sin(ar) + Math.Sin(br);
+        if (Math.Abs(x) < 1e-12 && Math.Abs(y) < 1e-12)
+        {
+            return a; // legs are exactly opposite; bisector undefined, fall back
+        }
+
+        return Geodesy.Normalize360(Math.Atan2(y, x) * 180.0 / Math.PI);
     }
 
     // --- Land-out achieved distance ---------------------------------------

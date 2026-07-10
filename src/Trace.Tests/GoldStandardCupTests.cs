@@ -39,19 +39,18 @@ public class GoldStandardCupTests
     }
 
     [Fact]
-    public void ClassifiesLargeZonesAsVariableBarrels()
+    public void ClassifiesByBarrelNotSector()
     {
         Course course = CourseReader.Read(GoldPath);
 
-        // Interior zones: three 10 km cylinders + one 20 km sector — all >= 1 km,
-        // so all four are variable turnpoints, none fixed checkpoints.
-        var interior = course.Points.Skip(1).SkipLast(1).ToList();
-        Assert.Equal(4, interior.Count);
-        Assert.All(interior, p => Assert.Equal(CoursePointType.Turnpoint, p.Type));
-        // ObsZone indices (0 = Start) map onto the trimmed list: Rushden is index 3
-        // (a 10 km cylinder) and Hardwick is index 4 (the 20 km / 45° sector).
-        Assert.Equal(10.0, course.Points.Single(p => p.Name == "Rushden").DefaultRadiusKm, 3);
-        Assert.Equal(20.0, course.Points.Single(p => p.Name == "Hardwick").DefaultRadiusKm, 3);
+        // Interior zones carry R1/A1 = observation sector and R2 = DHT barrel.
+        // Barrels: Banbury/Rushden/Northampton = 5 km (variable turnpoints);
+        // Hardwick = 0.5 km (fixed checkpoint). Classification uses the barrel.
+        Assert.Equal(4, course.Points.Skip(1).SkipLast(1).Count());
+        Assert.Equal(CoursePointType.Turnpoint, course.Points.Single(p => p.Name == "Rushden").Type);
+        Assert.Equal(5.0, course.Points.Single(p => p.Name == "Rushden").DefaultRadiusKm, 3);
+        Assert.Equal(CoursePointType.Checkpoint, course.Points.Single(p => p.Name == "Hardwick").Type);
+        Assert.Equal(0.5, course.Points.Single(p => p.Name == "Hardwick").DefaultRadiusKm, 3);
     }
 
     [Fact]
@@ -89,6 +88,12 @@ public class GoldStandardCupTests
                 Assert.Contains("Options,NearAlt=656.0ft", text);
                 Assert.Contains("SpeedStyle=", text);
                 Assert.Contains("MaxAlt=", text);
+
+                // Observation sectors (R1/A1) are untouched; only the barrel (R2)
+                // is resized. The 10 km turn sectors and the 20 km Hardwick sector
+                // must remain in every per-handicap file.
+                Assert.Contains("R1=10000m,A1=90", text);
+                Assert.Contains("R1=20000m,A1=45", text);
 
                 // The task re-reads (via the Scorer's path) and still has 6 points.
                 Trace.Scoring.ScoringTask st = Trace.Scoring.ScoringTask.FromCup(file);
