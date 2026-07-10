@@ -60,6 +60,17 @@ single engine-level parameter:
 |------------------|------|-------------|---------|
 | V_Ref_Cru | Float | Fleet anchor: nil-wind cruise airspeed of a notional $H=100$ glider, in km/h. Each glider's $V_a(H) = V_{\text{Ref\_Cru}} \times (H/100)$. | 130.0 |
 
+> **`V_Ref_Cru` is a calibration input, not a fixed constant.** It sets the wind
+> sensitivity of the whole windicap and therefore the barrel sizes; the 130
+> example is illustrative only. For a given contest it should be chosen to match
+> how the day was actually set. It can be recovered from a published task sheet:
+> the reference glider's air-mass ("Act") distance divided by its ground path
+> gives the air/ground ratio, and solving the §3.3 wind triangle for the airspeed
+> that yields that ratio gives $V_a(H_{\text{Ref}})$, hence
+> $V_{\text{Ref\_Cru}} = V_a / (H_{\text{Ref}}/100)$. (For the real Cambridge Cloud
+> Rally 2025 Task 1, this was ≈ 90 km/h, not 130 — using 130 undersized every
+> barrel by ~10 %.)
+
 > **Resolved — reference cruise airspeed:** Cruise speed is **not** published in
 > any handicap list (BGA, DAeC, or IGC carry only a single index, plus span/MTOW
 > for ballast classes). Deriving a per-glider polar and running MacCready
@@ -93,7 +104,28 @@ The sequence of waypoints defining the baseline race course.
 | 2            | TP2         | 51.9876       | -0.4567        | Checkpoint| 0.5 km (Cylinder)  |
 | N-1          | FINISH      | 52.1234       | -1.1234        | Finish   | 3.0 km (Cylinder)   |
 
-> **Question:** Appropriate data format? CUP file?
+**Data format: SeeYou `.CUP` task block** (see §5.1). The waypoint table plus a
+`-----Related Tasks-----` section is read directly. Note the CUP convention that a
+task line begins with the takeoff and ends with the landing — these may be `???`
+placeholders and are trimmed — and that `ObsZone=0` is the **Start** (the takeoff
+is not numbered).
+
+### Observation zone vs. barrel (two nested shapes)
+
+Each turnpoint carries **two** concentric shapes, and they serve different
+purposes — conflating them is the most common implementation error:
+
+- **Observation sector** (`R1`, half-angle `A1`): the *wide* zone that decides
+  whether the turnpoint was **rounded**. Typical DHT value ≈ 10 km / 90°.
+- **Barrel** (`R2`): the *inner* full circle whose radius is sized per handicap and
+  which drives the **distance calculation** (the corner-cut of §3.2). This is the
+  only quantity the optimiser varies.
+
+A fix **achieves** a turnpoint if it lies inside the barrel **or** inside the
+sector. The barrel is what §3.2/§3.4/§4.1 mean by "$R_i$". A plain cylinder task
+(no separate sector) sets only `R1` and treats it as both. A `Checkpoint` is a
+fixed turnpoint whose barrel does not vary with handicap (e.g. a mandatory routing
+point); the engine classifies a sub-1 km barrel as a checkpoint.
 
 ## 2.3 Atmospheric Wind Profile
 
@@ -182,7 +214,11 @@ $$V_{g,k}(H) = \sqrt{V_a(H)^2 - W_{X,k}^2} - W_{H,k}$$
 Let $H_{\text{Ref}}$ be the reference handicap (typically the highest performing
 glider in the fleet, or a fixed baseline like 120). Let $D_{\text{Ref}}$ be the
 total distance flown by the reference glider (who is assigned the minimum
-allowable barrel radius, typically $R_{\min} = 0.5$ km).
+allowable **barrel** radius, typically $R_{\min} = 0.5$ km). $D_{\text{Ref}}$ is
+the reference glider's *effective corner-cut* distance (§3.2 applied at $R_{\min}$)
+— it is **less than** the centre-to-centre task length, and it is the value the
+scorer uses in §4.2. All distances here refer to the barrel radius $R_i$; the
+observation sector plays no part in the distance calculation.
 
 The target effective task distance ($D_{\text{Target}}(H)$) for a glider with
 handicap $H$ in **Nil Wind** is:
@@ -204,8 +240,10 @@ $$\sum_{k=1}^{M} \frac{L_k(H)}{V_{g,k}(H)} = T_{\text{Ref}}$$
 
 ## 4.1 Barrel Radius Optimization Algorithm
 
-The system must dynamically size the barrels for each variable turnpoint to match
-the target distance or target time calculated in Section 3.
+The system must dynamically size the **barrels** (the inner `R2` circles) for each
+variable turnpoint to match the target distance or target time calculated in
+Section 3. The observation sectors (`R1/A1`) are fixed by the task-setter and are
+**not** touched by the optimiser.
 
 1. **Calculate Reference Fleet Metrics:** Compute $T_{\text{Ref}}$ and
    $D_{\text{Ref}}$ based on the wind profile and the high-performance benchmark
@@ -244,14 +282,38 @@ the target distance or target time calculated in Section 3.
 Post-flight, the system must process IGC GNSS log files using the exact barrel
 dimensions computed for that pilot's handicap class.
 
+### Zone achievement rules (apply to all of Case A and B)
+
+A turnpoint is **achieved** when a fix lies inside its **observation zone** — the
+barrel circle $R_2(H)$ **or** the observation sector ($R_1$ within half-angle
+$A_1$ of the zone direction). Note the achievement test uses the *sector*, which is
+wider than the barrel; the barrel radius $R_i(H)$ is used only for the distance
+maths above. A pilot who rounds wide (outside the small barrel but inside the
+10 km sector) has still achieved the turnpoint.
+
+- **Sector direction** follows the CUP `Style`: `Symmetric` opens **outward** —
+  along the reverse of the bisector of the bearings to the two neighbouring points
+  — so it faces away from both legs; `ToNext`/`ToPrev`/`ToStart` face the named
+  neighbour; `Fixed` uses `A12`. The angle is a half-angle: $A_1 = 45^\circ$ is a
+  $90^\circ$ sector, $A_1 = 180^\circ$ a full circle.
+- **In order:** turnpoints must be achieved in sequence. A later turnpoint cannot
+  be credited from a fix earlier than the one that achieved the previous point —
+  essential because the wide sectors overlap.
+
 ### Case A: Task Finishers
 
-If a pilot successfully navigates through the start line, intercepts all variable
-turnpoint cylinders (at their designated personalized radii $R_i(H)$), and
-crosses the finish line:
+If a pilot crosses the **start line**, achieves every turnpoint zone in order (at
+their personalised radii $R_i(H)$ / sectors), and crosses the finish:
 
-1. **Raw Duration ($T_{\text{Act}}$):** Calculate elapsed time from the exact
-   timestamp of start exit to finish entry.
+1. **Raw Duration ($T_{\text{Act}}$):** Calculate elapsed time from the start to
+   the finish.
+   - **Start:** the zone is a *line* (`Style=ToNext, Line=1`). Time the **line
+     crossing** (heading onto course), not the exit from a notional cylinder.
+     Because pilots climb in and out of the start zone before starting, take the
+     **last** start crossing/exit *before* the first turnpoint is reached — not
+     the first.
+   - **Finish:** entry to the finish ring (its radius exists to give landing room;
+     the ring boundary, not the centre, stops the clock).
 
 2. **Scoring Speed ($V_{\text{Score}}$):**
 
@@ -291,24 +353,35 @@ engine must **emit one standard `.CUP` task file per handicap**, each containing
 fixed observation-zone radii computed for that handicap. The file name should
 identify the handicap (e.g. `task_h93.cup`).
 
-- **Observation zones:** Each waypoint's zone is defined with the standard
+- **Observation zones:** Each waypoint's zone is the standard
   `ObsZone=<n>,Style=<0-4>,R1=,A1=,R2=,A2=,A12=` line, where `Style` is a numeric
-  direction code (0=Fixed, 1=Symmetric, 2=ToNext, 3=ToPrev, 4=ToStart) and
-  `R1/A1/R2/A2/A12` define the zone geometry. A 500 m turnpoint cylinder is
-  `ObsZone=1,Style=1,R1=500m,A1=180,R2=0m,A2=0`.
+  direction code (0=Fixed, 1=Symmetric, 2=ToNext, 3=ToPrev, 4=ToStart).
+  **`R1/A1` is the observation sector; `R2/A2` is the inner barrel** (see §2.2).
+  The engine sizes only `R2` per handicap and leaves `R1/A1` (and every other
+  field — `SpeedStyle`, `MaxAlt`, the `Options` line, the `???` takeoff/landing)
+  **untouched**, re-emitting the source task verbatim with just the barrel changed.
+  A plain 500 m cylinder (no separate sector) is
+  `ObsZone=1,Style=1,R1=500m,A1=180`.
 
-- **Format Structure (example for the $H=93$ glider):**
+- **Format Structure** — a variable turnpoint with a 10 km / 90° observation
+  sector and a per-handicap barrel of 6.4 km (`R2`); a fixed 0.5 km checkpoint; a
+  5 km start **line** and a 3 km finish ring:
 
 ```
-[Task]
-TPS=4
-ObsZone=0,Style=2,R1=5000m,A1=90,Line=1
-ObsZone=1,Style=1,R1=6400m,A1=180,R2=0m,A2=0
-ObsZone=2,Style=1,R1=4200m,A1=180,R2=0m,A2=0
-ObsZone=3,Style=1,R1=500m,A1=180,R2=0m,A2=0
+-----Related Tasks-----
+"Example task","???","START","TP1","TP2","FINISH","???"
+Options,NearAlt=300.0m
+ObsZone=0,Style=2,R1=5000m,A1=90,Line=1        ; start line (half-width R1)
+ObsZone=1,Style=1,R1=10000m,A1=45,R2=6400m,A2=180  ; sector R1/A1, barrel R2
+ObsZone=2,Style=1,R1=10000m,A1=45,R2=500m,A2=180   ; checkpoint (small barrel)
+ObsZone=3,Style=3,R1=3000m,A1=180              ; finish ring
 ```
 
-Spec: <https://github.com/naviter/seeyou_file_formats/blob/main/CUP_file_format.md>.
+Angles are half-angles (`A1=45` → 90° sector, `A1=180` → full circle). `ObsZone=0`
+is the Start; the leading/trailing `???` are the (unset) takeoff/landing.
+
+Spec: <https://github.com/naviter/seeyou_file_formats/blob/main/CUP_file_format.md>
+(a copy is kept at [`CUP_file_format.md`](CUP_file_format.md)).
 
 ## 5.2 Exception Handling & System Guardrails
 
@@ -339,10 +412,10 @@ The requirements were validated against the real-world gliding competition domai
 | Windicapping | ✅ Validated | Real BGA term; headwind penalty $\propto 1/(1-(W/V_a)^2)$ grows as $V_a$ falls, so slower gliders are disproportionately penalised. |
 | Wind-triangle ground speed (§3.3) | ✅ Validated | Correct crab solution; add domain guard $\lvert W_X\rvert \le V_a$. |
 | Distance-saved geometry (§3.2) | ✅ Validated | $2R\sin(\Delta\phi/2)=2R\cos(\theta/2)$ correct; wording on diverging $R$ tightened. |
-| Observation zones / cylinders | ✅ Validated | 500 m racing cylinder matches $R_{\min}$. "Barrel" is informal jargon, not a defined FAI/BGA term. |
+| Observation zones (sector + barrel) | ✅ Validated | A turnpoint has a wide observation sector (`R1/A1`, achievement) and an inner barrel (`R2`, distance). The optimiser sizes only the barrel. Symmetric sectors open outward; achievement is in-order. Confirmed against real Cloud Rally 2025 traces. |
 | IGC flight logs | ✅ Validated | Standard FAI GNSS log format for scoring. |
 | OpenAir / OpenAIP / CTR / TMA | ✅ Validated | Real airspace formats/classes; "SUA" label unconfirmed for this context. |
 | Handicap example values (§2.1) | ⚠️ Corrected | ASW 19 93.0 (was 98.0), JS3-18m 111.5 (was 114.0); declare scheme (BGA/DAeC/IGC). |
 | Reference cruise airspeed source | ✅ Resolved | Not in any list and polar-per-glider is impractical — derive from handicap: $V_a(H)=V_{\text{Ref\_Cru}}\times(H/100)$ from one fleet anchor speed. |
 | Shallow-turn $\theta>150^\circ$ rule | ⚠️ Heuristic | Sound logic, but the threshold is tunable, not fundamental. |
-| CUP export schema (§5.1) | ✅ Corrected | Original `VariableBlends`/`VariableRadiusTable`/`Style=Cylinder` block was invented and removed; §5.1 now uses standard numeric `ObsZone/Style/R1/A1/R2/A2/A12` lines, one task file per handicap. |
+| CUP export schema (§5.1) | ✅ Corrected | Standard numeric `ObsZone` lines, one task file per handicap. R1/A1 = sector, R2 = barrel (only R2 varies); source task re-emitted verbatim. Scorer reproduces the published Cloud Rally 2025 finisher speeds to 0.01 km/h. |
