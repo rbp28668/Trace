@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Trace.Core\Trace.Core.csproj" />
+    <ProjectReference Include="..\Trace.Planner\Trace.Planner.csproj" />
   </ItemGroup>
 
 </Project>

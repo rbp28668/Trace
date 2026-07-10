@@ -9,11 +9,12 @@ namespace Trace.Model;
 public class CupTask
 {
     public CupTask(string description, IReadOnlyList<string> waypointNames,
-        IReadOnlyList<ObservationZone> zones)
+        IReadOnlyList<ObservationZone> zones, string? optionsLine = null)
     {
         Description = description;
         WaypointNames = waypointNames;
         Zones = zones;
+        OptionsLine = optionsLine;
     }
 
     public string Description { get; }
@@ -23,4 +24,11 @@ public class CupTask
 
     /// <summary>Observation zones keyed by their <see cref="ObservationZone.PointIndex"/>.</summary>
     public IReadOnlyList<ObservationZone> Zones { get; }
+
+    /// <summary>
+    /// The verbatim <c>Options,…</c> line for this task, if the source file had one
+    /// (e.g. <c>Options,NearAlt=656.0ft</c>). Preserved for faithful re-emit; the
+    /// DHT engine does not otherwise interpret it. Null when absent.
+    /// </summary>
+    public string? OptionsLine { get; }
 }

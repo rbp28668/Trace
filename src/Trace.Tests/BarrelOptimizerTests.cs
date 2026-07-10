@@ -123,6 +123,38 @@ public class BarrelOptimizerTests
     }
 
     [Fact]
+    public void PerTurnpointBoundsAreHonoured()
+    {
+        // TP1 is pinned to a raised floor of 3 km (its own RMin); TP2 keeps the
+        // global 0.5 km floor. A low-handicap glider should never take TP1 below
+        // 3 km, and the reference glider sits exactly on each point's floor.
+        var points = new List<CoursePoint>
+        {
+            new("Start", 52.0, -1.0, CoursePointType.Start, 5.0),
+            new("TP1", 52.4, -1.0, CoursePointType.Turnpoint, 3.0, rMinKm: 3.0, rMaxKm: 10.0),
+            new("TP2", 52.4, -0.5, CoursePointType.Turnpoint, 0.5),
+            new("Finish", 52.0, -0.5, CoursePointType.Finish, 3.0),
+        };
+        var course = new Course(points);
+        var geometry = new CourseGeometry(course);
+        Fleet fleet = MakeFleet();
+
+        var opt = new BarrelOptimizer();
+        FleetPlan plan = opt.Optimize(course, geometry, fleet, referenceHandicap: 114.0);
+
+        foreach (GliderPlan gp in plan.Plans)
+        {
+            Assert.True(gp.RadiiKm[1] >= 3.0 - 1e-6, $"TP1 {gp.RadiiKm[1]} below its 3 km floor");
+            Assert.True(gp.RadiiKm[2] >= 0.5 - 1e-6, $"TP2 {gp.RadiiKm[2]} below the global floor");
+        }
+
+        // Reference glider sits on each point's own minimum.
+        GliderPlan js3 = plan.Plans.Single(p => p.Glider.Handicap == 114.0);
+        Assert.Equal(3.0, js3.RadiiKm[1], 3);
+        Assert.Equal(0.5, js3.RadiiKm[2], 3);
+    }
+
+    [Fact]
     public void RadiiStayWithinBounds()
     {
         Course course = MakeDogleg();

@@ -7,7 +7,7 @@ namespace Trace.Model;
 public class Waypoint
 {
     public Waypoint(string name, string code, double latitude, double longitude,
-        int style = 1, double elevationM = 0.0, string description = "")
+        int style = 1, double elevationM = 0.0, string description = "", string userData = "")
     {
         Name = name;
         Code = code;
@@ -16,6 +16,7 @@ public class Waypoint
         Style = style;
         ElevationM = elevationM;
         Description = description;
+        UserData = userData;
     }
 
     /// <summary>Full waypoint name (column <c>name</c>).</summary>
@@ -37,4 +38,11 @@ public class Waypoint
     public double ElevationM { get; }
 
     public string Description { get; }
+
+    /// <summary>
+    /// Free-text <c>userdata</c> column (CUP field 13). The DHT tools store a small
+    /// JSON blob here to carry per-turnpoint barrel bounds, e.g.
+    /// <c>{"rmin":0.5,"rmax":10}</c>; other CUP readers ignore it.
+    /// </summary>
+    public string UserData { get; }
 }

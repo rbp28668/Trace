@@ -93,6 +93,27 @@ public class CupTests
         // Start is a line zone.
         Assert.True(read.Zones[0].IsLine);
     }
+
+    [Fact]
+    public void WaypointUserDataRoundTrips()
+    {
+        var waypoints = new List<Waypoint>
+        {
+            new("Start", "STA", 52.0, -1.0, style: 4),
+            new("Turn 1", "TP1", 52.5, -0.5, description: "TP", userData: "{\"rmin\":3,\"rmax\":9}"),
+            new("Finish", "FIN", 52.0, -1.0, style: 4),
+        };
+
+        var sw = new StringWriter();
+        new CupWriter().Write(sw, waypoints);
+
+        var reader = new CupReader();
+        reader.Parse(new StringReader(sw.ToString()));
+
+        Assert.Equal("{\"rmin\":3,\"rmax\":9}", reader.Waypoints[1].UserData);
+        // Waypoints without userdata keep an empty field.
+        Assert.Equal(string.Empty, reader.Waypoints[0].UserData);
+    }
 }
 
 public class FleetReaderTests

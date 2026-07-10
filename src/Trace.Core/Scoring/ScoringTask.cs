@@ -55,21 +55,11 @@ public class ScoringTask
             byName.TryAdd(w.Name, w);
         }
 
-        // Drop a duplicated leading takeoff / trailing landing (CUP convention),
-        // tracking how many leading points were trimmed so ObsZone indices (which
-        // refer to the original list) still line up.
+        // Trim the CUP takeoff/landing (including ??? placeholders) so what remains
+        // is Start → turnpoints → Finish; the trimmed index then equals each
+        // point's ObsZone number (0 = Start, per spec).
         List<string> names = task.WaypointNames.ToList();
-        int leadingTrim = 0;
-        if (names.Count >= 2 && names[0].Equals(names[1], StringComparison.OrdinalIgnoreCase))
-        {
-            names.RemoveAt(0);
-            leadingTrim = 1;
-        }
-
-        if (names.Count >= 2 && names[^1].Equals(names[^2], StringComparison.OrdinalIgnoreCase))
-        {
-            names.RemoveAt(names.Count - 1);
-        }
+        CupTaskLayout.Trim(names, task.Zones.Count);
 
         var zonesByIndex = task.Zones.ToDictionary(z => z.PointIndex);
 
@@ -81,13 +71,18 @@ public class ScoringTask
                 throw new InvalidDataException($"Task waypoint '{names[i]}' not found in waypoint table.");
             }
 
-            CoursePointType type = i == 0 ? CoursePointType.Start
-                : i == names.Count - 1 ? CoursePointType.Finish
-                : CoursePointType.Turnpoint;
+            // Interior points keep whatever radius their zone declares; a control
+            // point (fixed, small radius) scores identically to a turnpoint here.
+            bool isStart = i == 0;
+            bool isFinish = i == names.Count - 1;
+            zonesByIndex.TryGetValue(i, out ObservationZone? z);
+            double radiusKm = z?.R1Metres / 1000.0 ?? 0.5;
 
-            double radiusKm = zonesByIndex.TryGetValue(i + leadingTrim, out ObservationZone? z)
-                ? z.R1Metres / 1000.0
-                : 0.5;
+            CoursePointType type = isStart ? CoursePointType.Start
+                : isFinish ? CoursePointType.Finish
+                : z != null && radiusKm < CourseReader.VariableBarrelThresholdKm
+                    ? CoursePointType.Checkpoint
+                    : CoursePointType.Turnpoint;
 
             points.Add(new ScoringPoint(wp.Name, wp.Latitude, wp.Longitude, type, radiusKm));
         }

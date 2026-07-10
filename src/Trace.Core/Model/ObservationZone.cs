@@ -44,6 +44,57 @@ public class ObservationZone
     /// <summary>True for a line zone (start/finish line); R1 is the half width.</summary>
     public bool IsLine { get; init; }
 
+    /// <summary>
+    /// The zone's original <c>ObsZone=…</c> tokens in file order (including the
+    /// leading <c>ObsZone</c> key), captured when read from a file. Lets the writer
+    /// re-emit a zone verbatim — preserving fields the engine does not model
+    /// (SpeedStyle, MaxAlt, …) — while substituting only R1. Null for zones the
+    /// engine synthesises.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>>? RawTokens { get; init; }
+
+    /// <summary>
+    /// Returns a copy of this zone with its R1 set to <paramref name="metres"/>,
+    /// updating the matching <see cref="RawTokens"/> entry in place so a verbatim
+    /// re-emit carries the new radius.
+    /// </summary>
+    public ObservationZone WithR1(double metres)
+    {
+        List<KeyValuePair<string, string>>? tokens = RawTokens?.ToList();
+        if (tokens != null)
+        {
+            string value = ((int)Math.Round(metres)).ToString(System.Globalization.CultureInfo.InvariantCulture) + "m";
+            bool replaced = false;
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].Key.Equals("R1", StringComparison.OrdinalIgnoreCase))
+                {
+                    tokens[i] = new KeyValuePair<string, string>(tokens[i].Key, value);
+                    replaced = true;
+                    break;
+                }
+            }
+
+            if (!replaced)
+            {
+                tokens.Add(new KeyValuePair<string, string>("R1", value));
+            }
+        }
+
+        return new ObservationZone
+        {
+            PointIndex = PointIndex,
+            Style = Style,
+            R1Metres = metres,
+            A1Degrees = A1Degrees,
+            R2Metres = R2Metres,
+            A2Degrees = A2Degrees,
+            A12Degrees = A12Degrees,
+            IsLine = IsLine,
+            RawTokens = tokens,
+        };
+    }
+
     /// <summary>Creates a symmetric cylinder zone of the given radius (km).</summary>
     public static ObservationZone Cylinder(int pointIndex, double radiusKm) => new()
     {

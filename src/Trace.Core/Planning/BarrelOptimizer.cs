@@ -196,10 +196,16 @@ public class BarrelOptimizer
 
     // --- Radius allocation -------------------------------------------------
 
+    /// <summary>Effective lower barrel bound for a point: its own RMin or the global default.</summary>
+    private double RMin(CoursePoint p) => p.RMinKm ?? options.RMinKm;
+
+    /// <summary>Effective upper barrel bound for a point: its own RMax or the global default.</summary>
+    private double RMax(CoursePoint p) => p.RMaxKm ?? options.RMaxKm;
+
     /// <summary>
     /// Builds the per-point radius array for a given total extra distance to save
     /// beyond the all-R_min baseline, distributed equally across variable
-    /// turnpoints (dht.md §4.1) and clamped to [R_min, R_max].
+    /// turnpoints (dht.md §4.1) and clamped to each point's [R_min, R_max].
     /// </summary>
     private double[] BuildRadii(Course course, double extraSavedKm, CourseGeometry geometry)
     {
@@ -216,8 +222,8 @@ public class BarrelOptimizer
             {
                 double half = Math.Sin(DeflectionRad(geometry, i) / 2.0);
                 // extra saving at this turnpoint = 2*(R - Rmin)*sin(Δφ/2) = perTurnpoint
-                double r = options.RMinKm + (half > 0 ? perTurnpoint / (2.0 * half) : 0.0);
-                radii[i] = Math.Clamp(r, options.RMinKm, options.RMaxKm);
+                double r = RMin(p) + (half > 0 ? perTurnpoint / (2.0 * half) : 0.0);
+                radii[i] = Math.Clamp(r, RMin(p), RMax(p));
             }
             else if (p.Type is CoursePointType.Turnpoint or CoursePointType.Checkpoint)
             {
@@ -234,11 +240,12 @@ public class BarrelOptimizer
 
     private double MaxExtraSavedKm(Course course, CourseGeometry geometry)
     {
+        IReadOnlyList<CoursePoint> pts = course.Points;
         double sum = 0.0;
         foreach (int i in VariableTurnpoints(course, geometry))
         {
             double half = Math.Sin(DeflectionRad(geometry, i) / 2.0);
-            sum += 2.0 * (options.RMaxKm - options.RMinKm) * half;
+            sum += 2.0 * (RMax(pts[i]) - RMin(pts[i])) * half;
         }
 
         return sum;
@@ -246,6 +253,7 @@ public class BarrelOptimizer
 
     private bool AnyClamped(Course course, CourseGeometry geometry, double extraSavedKm)
     {
+        IReadOnlyList<CoursePoint> pts = course.Points;
         List<int> variable = VariableTurnpoints(course, geometry);
         if (variable.Count == 0)
         {
@@ -256,8 +264,8 @@ public class BarrelOptimizer
         foreach (int i in variable)
         {
             double half = Math.Sin(DeflectionRad(geometry, i) / 2.0);
-            double r = options.RMinKm + (half > 0 ? perTurnpoint / (2.0 * half) : 0.0);
-            if (r > options.RMaxKm + 1e-9 || r < options.RMinKm - 1e-9)
+            double r = RMin(pts[i]) + (half > 0 ? perTurnpoint / (2.0 * half) : 0.0);
+            if (r > RMax(pts[i]) + 1e-9 || r < RMin(pts[i]) - 1e-9)
             {
                 return true;
             }
