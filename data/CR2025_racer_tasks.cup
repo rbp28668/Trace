@@ -1,0 +1,57 @@
+name,code,country,lat,lon,elev,style,rwdir,rwlen,rwwidth,freq,desc,userdata,pics
+-----Related Tasks-----
+"DAY1","???","Gransden Lodge","Banbury","Rushden","Northampton South","Hardwick","Gransden Lodge","???"
+Options,NearAlt=656.0ft
+ObsZone=0,Style=2,SpeedStyle=0,R1=5000m,A1=45,R2=0m,A2=0,MaxAlt=0.0ft,Line=1
+ObsZone=1,Style=1,SpeedStyle=1,R1=10000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=2,Style=1,SpeedStyle=1,R1=10000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=3,Style=1,SpeedStyle=1,R1=10000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=4,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=5,Style=3,SpeedStyle=2,R1=3000m,A1=180,R2=0m,A2=0,MaxAlt=0.0ft
+"DAY2","???","Gransden Lodge","Edgehill","Earith","Rushden","Hardwick","Gransden Lodge","???"
+Options,NearAlt=656.0ft
+ObsZone=0,Style=2,SpeedStyle=0,R1=5000m,A1=45,R2=0m,A2=0,MaxAlt=0.0ft,Line=1
+ObsZone=1,Style=1,SpeedStyle=1,R1=10000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=2,Style=1,SpeedStyle=1,R1=10000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=3,Style=1,SpeedStyle=1,R1=10000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=4,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=5,Style=3,SpeedStyle=2,R1=3000m,A1=180,R2=0m,A2=0,MaxAlt=0.0ft
+"DAY3","???","Gransden Lodge","Husbands Bosworth","Norman Cross","Northampton South","Hardwick","Gransden Lodge","???"
+Options,NearAlt=656.0ft
+ObsZone=0,Style=2,SpeedStyle=0,R1=5000m,A1=45,R2=0m,A2=0,MaxAlt=0.0ft,Line=1
+ObsZone=1,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=2,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=3,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=4,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=5,Style=3,SpeedStyle=2,R1=3000m,A1=180,R2=0m,A2=0,MaxAlt=0.0ft
+"DAY4","???","Gransden Lodge","Sackville","Towcester","Olney","Northampton West","St Neots","Gransden Lodge","???"
+Options,NearAlt=656.0ft
+ObsZone=0,Style=2,SpeedStyle=0,R1=5000m,A1=45,R2=0m,A2=0,MaxAlt=0.0ft,Line=1
+ObsZone=1,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=2,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=3,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=4,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=5,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=6,Style=3,SpeedStyle=2,R1=3000m,A1=180,R2=0m,A2=0,MaxAlt=0.0ft
+"DAY6","???","Gransden Lodge","Cambridge South","Stradishall","Elmswell W","Brinkley Church","Bury St Edmunds S","Cambridge South","Hardwick","Gransden Lodge","???"
+Options,NearAlt=656.0ft
+ObsZone=0,Style=2,SpeedStyle=0,R1=5000m,A1=45,R2=0m,A2=0,MaxAlt=0.0ft,Line=1
+ObsZone=1,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=2,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=3,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=4,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=5,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=6,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=7,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=8,Style=3,SpeedStyle=2,R1=3000m,A1=180,R2=0m,A2=0,MaxAlt=0.0ft
+"DAY7","???","Gransden Lodge","Sackville","Moreton-in-marsh","Bletchley","Bicester North West","Swalcliffe","Northampton South","St Neots S","Gransden Lodge","???"
+Options,NearAlt=656.0ft
+ObsZone=0,Style=2,SpeedStyle=0,R1=5000m,A1=45,R2=0m,A2=0,MaxAlt=0.0ft,Line=1
+ObsZone=1,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=2,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=3,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=4,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=5,Style=1,SpeedStyle=1,R1=20000m,A1=90,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=6,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=7,Style=1,SpeedStyle=1,R1=20000m,A1=45,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=8,Style=3,SpeedStyle=2,R1=3000m,A1=180,R2=0m,A2=0,MaxAlt=0.0ft
