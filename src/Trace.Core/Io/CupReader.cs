@@ -81,7 +81,9 @@ public class CupReader
 
         if (line.StartsWith("Options", StringComparison.OrdinalIgnoreCase))
         {
-            // Task options are not needed by the DHT engine; ignore for now.
+            // The DHT engine does not interpret task options, but we retain the
+            // line verbatim so a task can be re-emitted faithfully.
+            current?.SetOptions(line);
             return current;
         }
 
@@ -97,12 +99,16 @@ public class CupReader
     private static ObservationZone ParseObsZone(string line)
     {
         var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var tokens = new List<KeyValuePair<string, string>>();
         foreach (string part in line.Split(','))
         {
             int eq = part.IndexOf('=');
             if (eq > 0)
             {
-                fields[part.Substring(0, eq).Trim()] = part.Substring(eq + 1).Trim();
+                string key = part.Substring(0, eq).Trim();
+                string value = part.Substring(eq + 1).Trim();
+                fields[key] = value;
+                tokens.Add(new KeyValuePair<string, string>(key, value));
             }
         }
 
@@ -116,6 +122,7 @@ public class CupReader
             A2Degrees = GetDouble(fields, "A2", 0.0),
             A12Degrees = GetDouble(fields, "A12", 0.0),
             IsLine = GetInt(fields, "Line", 0) == 1,
+            RawTokens = tokens,
         };
     }
 
@@ -135,7 +142,8 @@ public class CupReader
             int style = f.Count > 6 && int.TryParse(f[6], NumberStyles.Integer,
                 CultureInfo.InvariantCulture, out int s) ? s : 1;
             string desc = f.Count > 11 ? f[11] : string.Empty;
-            return new Waypoint(f[0], f[1], lat, lon, style, elev, desc);
+            string userData = f.Count > 12 ? f[12] : string.Empty;
+            return new Waypoint(f[0], f[1], lat, lon, style, elev, desc, userData);
         }
         catch (FormatException)
         {
@@ -265,6 +273,7 @@ public class CupReader
         private readonly string description;
         private readonly List<string> names;
         private readonly List<ObservationZone> zones = new();
+        private string? optionsLine;
 
         public CupTaskBuilder(string description, List<string> names)
         {
@@ -274,9 +283,11 @@ public class CupReader
 
         public void AddZone(ObservationZone zone) => zones.Add(zone);
 
+        public void SetOptions(string line) => optionsLine = line;
+
         public void Commit(List<CupTask>? tasks)
         {
-            tasks?.Add(new CupTask(description, names, zones));
+            tasks?.Add(new CupTask(description, names, zones, optionsLine));
         }
     }
 }

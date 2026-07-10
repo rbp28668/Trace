@@ -28,6 +28,11 @@ public class CupWriter
         {
             os.WriteLine(TaskSeparator);
             os.WriteLine(FormatTaskLine(task));
+            if (!string.IsNullOrEmpty(task.OptionsLine))
+            {
+                os.WriteLine(task.OptionsLine);
+            }
+
             foreach (ObservationZone zone in task.Zones)
             {
                 os.WriteLine(FormatObsZone(zone));
@@ -47,7 +52,12 @@ public class CupWriter
         sb.Append(wp.Style.ToString(CultureInfo.InvariantCulture)).Append(',');
         sb.Append(",,,,");                               // rwdir,rwlen,rwwidth,freq
         sb.Append(Quote(wp.Description)).Append(',');
-        sb.Append(',');                                  // userdata
+        if (!string.IsNullOrEmpty(wp.UserData))          // userdata (DHT barrel bounds)
+        {
+            sb.Append(Quote(wp.UserData));
+        }
+
+        sb.Append(',');
         // pics (trailing field left empty)
         return sb.ToString();
     }
@@ -66,6 +76,14 @@ public class CupWriter
 
     private static string FormatObsZone(ObservationZone z)
     {
+        // When the zone was read from a file, re-emit its original tokens verbatim
+        // (preserving fields the engine does not model, e.g. SpeedStyle/MaxAlt);
+        // WithR1 has already substituted any resized barrel radius.
+        if (z.RawTokens is { Count: > 0 } tokens)
+        {
+            return string.Join(",", tokens.Select(t => $"{t.Key}={t.Value}"));
+        }
+
         var sb = new StringBuilder();
         sb.Append("ObsZone=").Append(z.PointIndex.ToString(CultureInfo.InvariantCulture));
         sb.Append(",Style=").Append(((int)z.Style).ToString(CultureInfo.InvariantCulture));

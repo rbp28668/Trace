@@ -1,0 +1,15 @@
+name,code,country,lat,lon,elev,style,rwdir,rwlen,rwwidth,freq,desc,userdata,pics
+"Gransden Lodge",GRL,UK,5211.179N,00006.674W,77.0m,4,0,0.0m,,"131.280","Turn Point, Clubhouse, N side of Cambridge GC site.",,
+"Banbury",BAN,UK,5204.355N,00118.784W,96.0m,1,,,,,"Turn Point, M40 J11/A422, 1.5 NMl NE of town Centre.",,
+"Rushden",RUS,UK,5219.458N,00035.905W,68.0m,1,,,,,"Turn Point, A6/River Bridge, Over River Nene 2 NMl N of Town.",,
+"Northampton South",NOS,UK,5211.150N,00053.719W,80.0m,1,,,,,"Turn Point, M1 J15/A508, A508 goes S to Stony Stratford.",,
+"Hardwick",HDW,UK,5213.216N,00000.022E,63.0m,1,,,,,"Turn Point, A428 Bridge, Minor road over A428 between Hardwick and Highfields.",,
+-----Related Tasks-----
+"Task 1 Racer 2025-08-09","???","Gransden Lodge","Banbury","Rushden","Northampton South","Hardwick","Gransden Lodge","???"
+Options,NearAlt=656.0ft
+ObsZone=0,Style=2,SpeedStyle=0,R1=5000m,A1=90,R2=0m,A2=0,MaxAlt=0.0ft,Line=1
+ObsZone=1,Style=1,SpeedStyle=1,R1=10000m,A1=135,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=2,Style=1,SpeedStyle=1,R1=10000m,A1=135,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=3,Style=1,SpeedStyle=1,R1=10000m,A1=135,R2=5000m,A2=180,MaxAlt=---ft
+ObsZone=4,Style=1,SpeedStyle=1,R1=10000m,A1=135,R2=500m,A2=180,MaxAlt=---ft
+ObsZone=5,Style=3,SpeedStyle=2,R1=3000m,A1=180,R2=0m,A2=0,MaxAlt=0.0ft

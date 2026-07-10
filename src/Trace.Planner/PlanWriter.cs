@@ -24,7 +24,12 @@ public static class PlanWriter
             GliderPlan representative = group.First();
             string file = Path.Combine(outDir, FileName(group.Key));
             using var sw = new StreamWriter(file);
-            writer.Write(sw, BuildWaypoints(course), BuildTask(course, representative));
+
+            // When the course carries its source .cup, reproduce that file exactly
+            // and change only the variable-barrel radii; otherwise synthesise a
+            // standard task from the course model.
+            IReadOnlyList<Waypoint> waypoints = course.SourceWaypoints ?? BuildWaypoints(course);
+            writer.Write(sw, waypoints, BuildTask(course, representative));
         }
     }
 
@@ -45,21 +50,43 @@ public static class PlanWriter
 
     private static CupTask BuildTask(Course course, GliderPlan plan)
     {
-        var names = course.Points.Select(p => p.Name).ToList();
-        var zones = new List<ObservationZone>();
+        string desc = $"{course.Description} H{plan.Glider.Handicap.ToString("0.#", CultureInfo.InvariantCulture)}".Trim();
 
+        // Faithful path: keep the original task line, options and every zone,
+        // substituting only R1 on the variable barrels (identified by point type).
+        if (course.SourceTaskNames != null)
+        {
+            var zones = new List<ObservationZone>();
+            for (int i = 0; i < course.Points.Count; i++)
+            {
+                CoursePoint p = course.Points[i];
+                if (p.SourceZone == null)
+                {
+                    continue;
+                }
+
+                zones.Add(p.Type == CoursePointType.Turnpoint
+                    ? p.SourceZone.WithBarrel(plan.RadiiKm[i] * 1000.0)
+                    : p.SourceZone);
+            }
+
+            return new CupTask(desc, course.SourceTaskNames, zones, course.OptionsLine);
+        }
+
+        // Synthesised path: build a standard task from the course model.
+        var names = course.Points.Select(p => p.Name).ToList();
+        var built = new List<ObservationZone>();
         for (int i = 0; i < course.Points.Count; i++)
         {
             CoursePoint p = course.Points[i];
-            zones.Add(p.Type switch
+            built.Add(p.Type switch
             {
                 CoursePointType.Start => ObservationZone.LineZone(i, p.DefaultRadiusKm),
                 _ => ObservationZone.Cylinder(i, plan.RadiiKm[i]),
             });
         }
 
-        string desc = $"{course.Description} H{plan.Glider.Handicap.ToString("0.#", CultureInfo.InvariantCulture)}".Trim();
-        return new CupTask(desc, names, zones);
+        return new CupTask(desc, names, built);
     }
 
     private static string ShortCode(string name)

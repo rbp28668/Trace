@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Trace.Model;
 
 namespace Trace.Io;
@@ -22,6 +23,12 @@ public static class CourseReader
 
     /// <summary>Default/min turnpoint radius (km).</summary>
     public const double DefaultTurnpointRadiusKm = 0.5;
+
+    /// <summary>
+    /// Interior zones at or above this radius (km) are variable barrels the
+    /// optimiser may resize; smaller ones are fixed control points (checkpoints).
+    /// </summary>
+    public const double VariableBarrelThresholdKm = 1.0;
 
     public static Course Read(string path)
     {
@@ -54,23 +61,17 @@ public static class CourseReader
             byName.TryAdd(w.Name, w);
         }
 
-        // Drop a leading takeoff / trailing landing if they duplicate the
-        // adjacent start/finish waypoint (common CUP convention).
+        // Trim the CUP takeoff/landing so what remains is Start → turnpoints →
+        // Finish; the trimmed index then equals each point's ObsZone number.
         List<string> names = task.WaypointNames.ToList();
-        if (names.Count >= 2 && names[0].Equals(names[1], StringComparison.OrdinalIgnoreCase))
-        {
-            names.RemoveAt(0);
-        }
-
-        if (names.Count >= 2 && names[^1].Equals(names[^2], StringComparison.OrdinalIgnoreCase))
-        {
-            names.RemoveAt(names.Count - 1);
-        }
+        CupTaskLayout.Trim(names, task.Zones.Count);
 
         if (names.Count < 2)
         {
             throw new InvalidDataException("CUP task needs at least a start and finish.");
         }
+
+        var zonesByIndex = task.Zones.ToDictionary(z => z.PointIndex);
 
         var points = new List<CoursePoint>();
         for (int i = 0; i < names.Count; i++)
@@ -80,20 +81,61 @@ public static class CourseReader
                 throw new InvalidDataException($"Task waypoint '{names[i]}' not found in the file's waypoint table.");
             }
 
-            CoursePointType type = i == 0 ? CoursePointType.Start
-                : i == names.Count - 1 ? CoursePointType.Finish
-                : CoursePointType.Turnpoint;
+            bool isStart = i == 0;
+            bool isFinish = i == names.Count - 1;
+            zonesByIndex.TryGetValue(i, out ObservationZone? zone);
 
-            double radius = type switch
-            {
-                CoursePointType.Start => DefaultStartRadiusKm,
-                CoursePointType.Finish => DefaultFinishRadiusKm,
-                _ => DefaultTurnpointRadiusKm,
-            };
+            // Radius comes from the file's ObsZone barrel when present, else a role
+            // default. The DHT engine sizes the barrel (R2, or R1 for a cylinder).
+            double radius = zone?.BarrelRadiusMetres / 1000.0 ?? (isStart ? DefaultStartRadiusKm
+                : isFinish ? DefaultFinishRadiusKm
+                : DefaultTurnpointRadiusKm);
 
-            points.Add(new CoursePoint(wp.Name, wp.Latitude, wp.Longitude, type, radius));
+            // An interior point whose file zone is below the barrel threshold is a
+            // fixed control point; at/above it (or with no zone to say otherwise)
+            // it is a variable turnpoint the optimiser may resize.
+            (double? rMin, double? rMax) = ParseBounds(wp.UserData);
+
+            // A point is a fixed checkpoint if its file zone is below the barrel
+            // threshold; but an explicit rMin/rMax in userdata always marks it
+            // variable (the task-setter said so, even at a small radius).
+            bool hasExplicitBounds = rMin != null || rMax != null;
+            CoursePointType type = isStart ? CoursePointType.Start
+                : isFinish ? CoursePointType.Finish
+                : !hasExplicitBounds && zone != null && radius < VariableBarrelThresholdKm
+                    ? CoursePointType.Checkpoint
+                    : CoursePointType.Turnpoint;
+
+            points.Add(new CoursePoint(wp.Name, wp.Latitude, wp.Longitude, type, radius, zone, rMin, rMax));
         }
 
-        return new Course(points, task.Description);
+        return new Course(points, task.Description, task.WaypointNames, task.OptionsLine,
+            reader.Waypoints.ToList());
+    }
+
+    /// <summary>
+    /// Parses per-turnpoint barrel bounds from a waypoint's userdata JSON, e.g.
+    /// <c>{"rmin":0.5,"rmax":10}</c> (km). Returns nulls for absent or unparseable
+    /// data so the optimiser falls back to its global bounds.
+    /// </summary>
+    private static (double? RMinKm, double? RMaxKm) ParseBounds(string userData)
+    {
+        if (string.IsNullOrWhiteSpace(userData) || !userData.TrimStart().StartsWith('{'))
+        {
+            return (null, null);
+        }
+
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(userData);
+            JsonElement root = doc.RootElement;
+            double? min = root.TryGetProperty("rmin", out JsonElement e1) && e1.TryGetDouble(out double m) ? m : null;
+            double? max = root.TryGetProperty("rmax", out JsonElement e2) && e2.TryGetDouble(out double x) ? x : null;
+            return (min, max);
+        }
+        catch (JsonException)
+        {
+            return (null, null); // ignore malformed userdata rather than failing the read
+        }
     }
 }
