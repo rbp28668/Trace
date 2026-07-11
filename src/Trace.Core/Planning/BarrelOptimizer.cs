@@ -70,7 +70,7 @@ public class BarrelOptimizer
         double vRefAirspeed = Windicap.Airspeed(fleet.VRefCruKmh, referenceHandicap);
 
         // Reference glider flies R_min at every variable turnpoint.
-        double[] refRadii = BuildRadii(course, extraSavedKm: 0.0, geometry);
+        double[] refRadii = BuildRadii(course, options.RMinKm, geometry);
         double tRef = DurationHours(course, geometry, refRadii, vRefAirspeed,
             windSpeed: WindSpeed, windDirection: WindDirection);
         double dRef = EffectiveDistanceKm(course, geometry, refRadii);
@@ -110,48 +110,42 @@ public class BarrelOptimizer
 
         double toleranceHours = options.ToleranceSeconds / 3600.0;
 
-        // Maximum extra distance that can be saved with every variable turnpoint at R_max.
-        double maxExtraSaved = MaxExtraSavedKm(course, geometry);
+        // A single barrel radius R is applied to EVERY variable turnpoint. Larger R
+        // saves more distance (and more at acute turns than obtuse, since the saving
+        // is 2·R·sin(Δφ/2)) so the task takes less time — monotonic in R. Bisect R
+        // in [R_min, R_max] to match the reference time.
+        double tAtMin = DurationHours(course, geometry, BuildRadii(course, options.RMinKm, geometry),
+            airspeed, WindSpeed, WindDirection);
 
-        // Duration at the two extremes (more saving => less time, monotonic).
-        double[] radiiAtZero = BuildRadii(course, 0.0, geometry);
-        double tAtZero = DurationHours(course, geometry, radiiAtZero, airspeed, WindSpeed, WindDirection);
-
-        double extra;
+        double radius;
         bool converged;
-        if (tAtZero <= tRef + toleranceHours)
+        if (tAtMin <= tRef + toleranceHours)
         {
-            // Already at or below T_Ref with minimum barrels (e.g. the reference
-            // glider itself, or a higher-H glider): no expansion needed.
-            extra = 0.0;
-            converged = Math.Abs(tAtZero - tRef) <= toleranceHours;
+            // Already at or below T_Ref at R_min (the reference glider itself, or a
+            // higher-H glider): no expansion needed.
+            radius = options.RMinKm;
+            converged = Math.Abs(tAtMin - tRef) <= toleranceHours;
         }
         else
         {
-            double[] radiiAtMax = BuildRadii(course, maxExtraSaved, geometry);
-            double tAtMax = DurationHours(course, geometry, radiiAtMax, airspeed, WindSpeed, WindDirection);
+            double tAtMax = DurationHours(course, geometry, BuildRadii(course, options.RMaxKm, geometry),
+                airspeed, WindSpeed, WindDirection);
             if (tAtMax > tRef + toleranceHours)
             {
-                // Cannot expand barrels enough to reach T_Ref.
-                extra = maxExtraSaved;
+                // Even R_max at every turnpoint cannot reach the reference time.
+                radius = options.RMaxKm;
                 converged = false;
                 warnings.Add($"Cannot reach reference time even at R_max={options.RMaxKm} km " +
                     "for all variable turnpoints; using maximum barrels.");
             }
             else
             {
-                extra = Bisect(course, geometry, airspeed, tRef, maxExtraSaved, toleranceHours);
+                radius = BisectRadius(course, geometry, airspeed, tRef, toleranceHours);
                 converged = true;
             }
         }
 
-        double[] radii = BuildRadii(course, extra, geometry);
-        if (AnyClamped(course, geometry, extra))
-        {
-            warnings.Add("One or more barrels hit a bound (R_min/R_max); " +
-                "distance reallocated across remaining turnpoints.");
-        }
-
+        double[] radii = BuildRadii(course, radius, geometry);
         double duration = DurationHours(course, geometry, radii, airspeed, WindSpeed, WindDirection);
         return new GliderPlan
         {
@@ -164,11 +158,16 @@ public class BarrelOptimizer
         };
     }
 
-    private double Bisect(Course course, CourseGeometry geometry, double airspeed,
-        double tRef, double maxExtra, double toleranceHours)
+    /// <summary>
+    /// Bisects the single barrel radius R in [R_min, R_max] so the simulated task
+    /// duration matches <paramref name="tRef"/>. Duration decreases monotonically
+    /// with R (bigger barrels save more distance).
+    /// </summary>
+    private double BisectRadius(Course course, CourseGeometry geometry, double airspeed,
+        double tRef, double toleranceHours)
     {
-        double lo = 0.0;
-        double hi = maxExtra;
+        double lo = options.RMinKm;
+        double hi = options.RMaxKm;
         for (int i = 0; i < options.MaxIterations; i++)
         {
             double mid = 0.5 * (lo + hi);
@@ -180,7 +179,7 @@ public class BarrelOptimizer
                 return mid;
             }
 
-            // More saving -> less time. If still too slow, save more.
+            // Bigger R -> less time. If still too slow, grow R.
             if (t > tRef)
             {
                 lo = mid;
@@ -203,75 +202,28 @@ public class BarrelOptimizer
     private double RMax(CoursePoint p) => p.RMaxKm ?? options.RMaxKm;
 
     /// <summary>
-    /// Builds the per-point radius array for a given total extra distance to save
-    /// beyond the all-R_min baseline, distributed equally across variable
-    /// turnpoints (dht.md §4.1) and clamped to each point's [R_min, R_max].
+    /// Builds the per-point radius array with a single uniform barrel radius
+    /// <paramref name="radiusKm"/> applied to every variable turnpoint (clamped to
+    /// that point's [R_min, R_max]). Fixed interior zones (checkpoints) and
+    /// start/finish keep their default radii. A uniform R means the distance saved
+    /// varies with each turn's geometry — an acute turn saves more than an obtuse
+    /// one — which is the intended DHT behaviour (dht.md §3.2, §4.1).
     /// </summary>
-    private double[] BuildRadii(Course course, double extraSavedKm, CourseGeometry geometry)
+    private double[] BuildRadii(Course course, double radiusKm, CourseGeometry geometry)
     {
         IReadOnlyList<CoursePoint> pts = course.Points;
         var radii = new double[pts.Count];
         List<int> variable = VariableTurnpoints(course, geometry);
 
-        double perTurnpoint = variable.Count > 0 ? extraSavedKm / variable.Count : 0.0;
-
         for (int i = 0; i < pts.Count; i++)
         {
             CoursePoint p = pts[i];
-            if (variable.Contains(i))
-            {
-                double half = Math.Sin(DeflectionRad(geometry, i) / 2.0);
-                // extra saving at this turnpoint = 2*(R - Rmin)*sin(Δφ/2) = perTurnpoint
-                double r = RMin(p) + (half > 0 ? perTurnpoint / (2.0 * half) : 0.0);
-                radii[i] = Math.Clamp(r, RMin(p), RMax(p));
-            }
-            else if (p.Type is CoursePointType.Turnpoint or CoursePointType.Checkpoint)
-            {
-                radii[i] = p.DefaultRadiusKm; // fixed interior zone
-            }
-            else
-            {
-                radii[i] = p.DefaultRadiusKm; // start/finish (not used for corner saving)
-            }
+            radii[i] = variable.Contains(i)
+                ? Math.Clamp(radiusKm, RMin(p), RMax(p))
+                : p.DefaultRadiusKm; // checkpoints and start/finish keep their zone
         }
 
         return radii;
-    }
-
-    private double MaxExtraSavedKm(Course course, CourseGeometry geometry)
-    {
-        IReadOnlyList<CoursePoint> pts = course.Points;
-        double sum = 0.0;
-        foreach (int i in VariableTurnpoints(course, geometry))
-        {
-            double half = Math.Sin(DeflectionRad(geometry, i) / 2.0);
-            sum += 2.0 * (RMax(pts[i]) - RMin(pts[i])) * half;
-        }
-
-        return sum;
-    }
-
-    private bool AnyClamped(Course course, CourseGeometry geometry, double extraSavedKm)
-    {
-        IReadOnlyList<CoursePoint> pts = course.Points;
-        List<int> variable = VariableTurnpoints(course, geometry);
-        if (variable.Count == 0)
-        {
-            return false;
-        }
-
-        double perTurnpoint = extraSavedKm / variable.Count;
-        foreach (int i in variable)
-        {
-            double half = Math.Sin(DeflectionRad(geometry, i) / 2.0);
-            double r = RMin(pts[i]) + (half > 0 ? perTurnpoint / (2.0 * half) : 0.0);
-            if (r > RMax(pts[i]) + 1e-9 || r < RMin(pts[i]) - 1e-9)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /// <summary>
