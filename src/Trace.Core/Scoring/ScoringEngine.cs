@@ -62,7 +62,9 @@ public class ScoringEngine
         //    before it; this also avoids the return-to-start finish (start and
         //    finish often share an airfield). A line start is timed at the line
         //    crossing; a cylinder start at the zone exit.
-        int firstTpEntry = pts.Count > 1 ? FindZoneEntry(pts[1], trace, 0, ZoneDirection(pts, 1)) : -1;
+        int firstTpEntry = pts.Count > 1
+            ? FindZoneEntry(pts[1], trace, 0, ZoneDirection(pts, 1), EffectiveHalfAngle(pts, 1))
+            : -1;
         ScoringPoint startPoint = pts[0];
         int startFixIndex = startPoint.IsLine && pts.Count > 1
             ? FindStartLineCrossing(startPoint, pts[1], trace, firstTpEntry)
@@ -85,7 +87,7 @@ public class ScoringEngine
 
         for (int p = 1; p < pts.Count; p++)
         {
-            int entry = FindZoneEntry(pts[p], trace, searchFrom, ZoneDirection(pts, p));
+            int entry = FindZoneEntry(pts[p], trace, searchFrom, ZoneDirection(pts, p), EffectiveHalfAngle(pts, p));
             if (entry < 0)
             {
                 break; // did not reach this point (in order)
@@ -217,11 +219,11 @@ public class ScoringEngine
     /// (half-angle ≥ 180°) reduces to a plain radius test.
     /// </summary>
     private static int FindZoneEntry(ScoringPoint point, IReadOnlyList<TracePoint> trace, int from,
-        double zoneDirDeg)
+        double zoneDirDeg, double halfAngleDeg)
     {
         for (int i = from; i < trace.Count; i++)
         {
-            if (InZone(point, trace[i], zoneDirDeg))
+            if (InZone(point, trace[i], zoneDirDeg, halfAngleDeg))
             {
                 return i;
             }
@@ -232,10 +234,10 @@ public class ScoringEngine
 
     /// <summary>
     /// True if the fix lies in the point's observation zone: inside the barrel
-    /// circle, or inside the sector (within the sector radius and within the
-    /// half-angle either side of <paramref name="zoneDirDeg"/>).
+    /// circle, or inside the sector (within the sector radius and within
+    /// <paramref name="halfAngleDeg"/> either side of <paramref name="zoneDirDeg"/>).
     /// </summary>
-    private static bool InZone(ScoringPoint point, TracePoint fix, double zoneDirDeg)
+    private static bool InZone(ScoringPoint point, TracePoint fix, double zoneDirDeg, double halfAngleDeg)
     {
         double d = DistanceKm(point, fix);
         if (d <= point.RadiusKm)
@@ -249,14 +251,14 @@ public class ScoringEngine
             return false;
         }
 
-        if (point.SectorHalfAngleDeg >= 180.0)
+        if (halfAngleDeg >= 180.0)
         {
             return true; // full-circle sector
         }
 
         double bearing = Geodesy.BearingDegrees(point.Latitude, point.Longitude, fix.Northings, fix.Eastings);
         double diff = Math.Abs(((bearing - zoneDirDeg + 540.0) % 360.0) - 180.0);
-        return diff <= point.SectorHalfAngleDeg;
+        return diff <= halfAngleDeg;
     }
 
     /// <summary>
@@ -297,6 +299,10 @@ public class ScoringEngine
                 return toPrev ?? toNext ?? 0.0;
         }
     }
+
+    /// <summary>Sector half-angle to use at point <paramref name="i"/> (its own).</summary>
+    private static double EffectiveHalfAngle(IReadOnlyList<ScoringPoint> pts, int i)
+        => pts[i].SectorHalfAngleDeg;
 
     /// <summary>Angular bisector (deg true) of two bearings.</summary>
     private static double Bisector(double a, double b)
