@@ -21,17 +21,22 @@ public class PlannerArgs
     public IReadOnlyList<string> AirspacePaths { get; init; } = Array.Empty<string>();
     public double MaxZoneHeightFt { get; init; } = 10000.0;
 
+    /// <summary>Optional path for a fleet-overview SVG task diagram; null to skip.</summary>
+    public string? SvgPath { get; init; }
+
     public const string Usage =
         "Usage: Trace.Planner --fleet <fleet.csv> --course <course.cup> --wind <dir>/<speed>\n" +
         "                     [--vref <kmh>] [--href <handicap>]\n" +
-        "                     [--airspace <a.txt,b.txt>] [--max-height <ft>] --out <dir>\n" +
+        "                     [--airspace <a.txt,b.txt>] [--max-height <ft>]\n" +
+        "                     [--svg <file.svg>] --out <dir>\n" +
         "\n" +
         "  --wind 270/30   wind FROM 270° true at 30 km/h\n" +
         "  --vref 130      cruise airspeed of a notional H=100 glider (km/h, default 130)\n" +
         "  --href 120      reference handicap (default: highest in fleet)\n" +
         "  --airspace      comma-separated OpenAir files; barrels intersecting\n" +
         "                  controlled airspace are a hard error (dht.md §5.2)\n" +
-        "  --max-height    zone ceiling in ft for airspace checks (default 10000)";
+        "  --max-height    zone ceiling in ft for airspace checks (default 10000)\n" +
+        "  --svg           write a fleet-overview SVG diagram (sectors + baseline barrels)";
 
     public static PlannerArgs Parse(string[] args)
     {
@@ -40,6 +45,7 @@ public class PlannerArgs
         double? href = null;
         var airspace = new List<string>();
         double maxHeight = 10000.0;
+        string? svg = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -57,6 +63,7 @@ public class PlannerArgs
                         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                     break;
                 case "--max-height": maxHeight = ParseDouble(Next(args, ref i, a), a); break;
+                case "--svg": svg = Next(args, ref i, a); break;
                 default:
                     throw new PlannerArgsException($"Unknown argument: {a}");
             }
@@ -79,6 +86,7 @@ public class PlannerArgs
             ReferenceHandicap = href,
             AirspacePaths = airspace,
             MaxZoneHeightFt = maxHeight,
+            SvgPath = svg,
         };
     }
 

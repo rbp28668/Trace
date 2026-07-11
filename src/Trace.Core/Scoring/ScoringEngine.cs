@@ -62,7 +62,10 @@ public class ScoringEngine
         //    before it; this also avoids the return-to-start finish (start and
         //    finish often share an airfield). A line start is timed at the line
         //    crossing; a cylinder start at the zone exit.
-        int firstTpEntry = pts.Count > 1 ? FindZoneEntry(pts[1], trace, 0, ZoneDirection(pts, 1)) : -1;
+        // Anchor the start search on the first arrival at the first turnpoint's
+        // BARREL — a tight, direction-independent circle — not its wide observation
+        // sector, which would make the start window depend on sector orientation.
+        int firstTpEntry = pts.Count > 1 ? FindBarrelEntry(pts[1], trace, 0) : -1;
         ScoringPoint startPoint = pts[0];
         int startFixIndex = startPoint.IsLine && pts.Count > 1
             ? FindStartLineCrossing(startPoint, pts[1], trace, firstTpEntry)
@@ -85,7 +88,7 @@ public class ScoringEngine
 
         for (int p = 1; p < pts.Count; p++)
         {
-            int entry = FindZoneEntry(pts[p], trace, searchFrom, ZoneDirection(pts, p));
+            int entry = FindZoneEntry(pts[p], trace, searchFrom, ZoneDirection(pts, p), EffectiveHalfAngle(pts, p));
             if (entry < 0)
             {
                 break; // did not reach this point (in order)
@@ -217,11 +220,11 @@ public class ScoringEngine
     /// (half-angle ≥ 180°) reduces to a plain radius test.
     /// </summary>
     private static int FindZoneEntry(ScoringPoint point, IReadOnlyList<TracePoint> trace, int from,
-        double zoneDirDeg)
+        double zoneDirDeg, double halfAngleDeg)
     {
         for (int i = from; i < trace.Count; i++)
         {
-            if (InZone(point, trace[i], zoneDirDeg))
+            if (InZone(point, trace[i], zoneDirDeg, halfAngleDeg))
             {
                 return i;
             }
@@ -232,10 +235,10 @@ public class ScoringEngine
 
     /// <summary>
     /// True if the fix lies in the point's observation zone: inside the barrel
-    /// circle, or inside the sector (within the sector radius and within the
-    /// half-angle either side of <paramref name="zoneDirDeg"/>).
+    /// circle, or inside the sector (within the sector radius and within
+    /// <paramref name="halfAngleDeg"/> either side of <paramref name="zoneDirDeg"/>).
     /// </summary>
-    private static bool InZone(ScoringPoint point, TracePoint fix, double zoneDirDeg)
+    private static bool InZone(ScoringPoint point, TracePoint fix, double zoneDirDeg, double halfAngleDeg)
     {
         double d = DistanceKm(point, fix);
         if (d <= point.RadiusKm)
@@ -249,23 +252,23 @@ public class ScoringEngine
             return false;
         }
 
-        if (point.SectorHalfAngleDeg >= 180.0)
+        if (halfAngleDeg >= 180.0)
         {
             return true; // full-circle sector
         }
 
         double bearing = Geodesy.BearingDegrees(point.Latitude, point.Longitude, fix.Northings, fix.Eastings);
         double diff = Math.Abs(((bearing - zoneDirDeg + 540.0) % 360.0) - 180.0);
-        return diff <= point.SectorHalfAngleDeg;
+        return diff <= halfAngleDeg;
     }
 
     /// <summary>
     /// Direction (deg true) the observation sector at point <paramref name="i"/>
-    /// faces, per its <see cref="ZoneStyle"/>. A symmetric sector opens OUTWARD,
-    /// away from the incoming and outgoing legs (the SeeYou convention): its
-    /// direction is the reverse of the bisector of the bearings to the neighbours.
-    /// Directional styles face the relevant neighbour. Returns 0 for a full-circle
-    /// zone (direction unused).
+    /// is bisected by, per its <see cref="ZoneStyle"/>. A symmetric sector opens
+    /// OUTWARD, away from the course — the reverse of the bisector of the bearings
+    /// to the two neighbouring points, so it faces away from both legs (dht.md
+    /// §4.2). Directional styles face the relevant neighbour. Returns 0 for a
+    /// full-circle zone (direction unused).
     /// </summary>
     private static double ZoneDirection(IReadOnlyList<ScoringPoint> pts, int i)
     {
@@ -289,13 +292,33 @@ public class ScoringEngine
             default:
                 if (toPrev is double a && toNext is double b)
                 {
-                    // Sector opens away from both legs: reverse the bisector of the
-                    // bearings toward the two neighbours.
+                    // Symmetric sector opens OUTWARD, away from the course: the
+                    // reverse of the inward bisector of the bearings to the two
+                    // neighbours, so it faces away from both legs (dht.md §4.2,
+                    // ObservationZone SeeYou convention).
                     return Geodesy.Normalize360(Bisector(a, b) + 180.0);
                 }
 
                 return toPrev ?? toNext ?? 0.0;
         }
+    }
+
+    /// <summary>Sector half-angle to use at point <paramref name="i"/> (its own).</summary>
+    private static double EffectiveHalfAngle(IReadOnlyList<ScoringPoint> pts, int i)
+        => pts[i].SectorHalfAngleDeg;
+
+    /// <summary>First fix at or after <paramref name="from"/> inside the point's barrel circle.</summary>
+    private static int FindBarrelEntry(ScoringPoint point, IReadOnlyList<TracePoint> trace, int from)
+    {
+        for (int i = from; i < trace.Count; i++)
+        {
+            if (DistanceKm(point, trace[i]) <= point.RadiusKm)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     /// <summary>Angular bisector (deg true) of two bearings.</summary>
