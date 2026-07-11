@@ -95,8 +95,18 @@ public class ScoringEngine
             }
 
             achieved = p;
-            searchFrom = entry;
             finishTime = trace[entry].When;
+
+            // The finish (last point) is only "arrived at" once the previous point
+            // has actually been TURNED, not merely clipped: a wide observation
+            // sector can be entered while transiting toward the finish (start and
+            // finish often share the last turnpoint's approach). So search the
+            // finish from the last turnpoint's closest-approach fix — the turn —
+            // rather than from where its sector was first entered.
+            bool nextIsFinish = p + 1 == pts.Count - 1;
+            searchFrom = nextIsFinish
+                ? NearestFixInZone(pts[p], trace, entry, ZoneDirection(pts, p), EffectiveHalfAngle(pts, p))
+                : entry;
         }
 
         // 3a. Case A — finisher.
@@ -264,11 +274,11 @@ public class ScoringEngine
 
     /// <summary>
     /// Direction (deg true) the observation sector at point <paramref name="i"/>
-    /// faces, per its <see cref="ZoneStyle"/>. A symmetric sector opens OUTWARD,
-    /// away from the incoming and outgoing legs (the SeeYou convention): its
-    /// direction is the reverse of the bisector of the bearings to the neighbours.
-    /// Directional styles face the relevant neighbour. Returns 0 for a full-circle
-    /// zone (direction unused).
+    /// is bisected by, per its <see cref="ZoneStyle"/>. A symmetric sector opens
+    /// INWARD, toward the course — along the bisector of the bearings to the two
+    /// neighbouring points — as shown by the SeeYou Observation Zone preview
+    /// (docs/simple_task_turnpoint.png / _checkpoint.png). Directional styles face
+    /// the relevant neighbour. Returns 0 for a full-circle zone (direction unused).
     /// </summary>
     private static double ZoneDirection(IReadOnlyList<ScoringPoint> pts, int i)
     {
@@ -292,9 +302,10 @@ public class ScoringEngine
             default:
                 if (toPrev is double a && toNext is double b)
                 {
-                    // Sector opens away from both legs: reverse the bisector of the
-                    // bearings toward the two neighbours.
-                    return Geodesy.Normalize360(Bisector(a, b) + 180.0);
+                    // Symmetric sector opens INWARD, toward the course: along the
+                    // bisector of the bearings to the two neighbours (confirmed by
+                    // the SeeYou Observation Zone preview, docs/simple_task_*.png).
+                    return Bisector(a, b);
                 }
 
                 return toPrev ?? toNext ?? 0.0;
@@ -304,6 +315,34 @@ public class ScoringEngine
     /// <summary>Sector half-angle to use at point <paramref name="i"/> (its own).</summary>
     private static double EffectiveHalfAngle(IReadOnlyList<ScoringPoint> pts, int i)
         => pts[i].SectorHalfAngleDeg;
+
+    /// <summary>
+    /// The closest-approach fix of the zone visit that begins at
+    /// <paramref name="entry"/>: from the entry, advance while the trace stays in
+    /// the zone and return the nearest fix. This marks where the point was turned.
+    /// </summary>
+    private static int NearestFixInZone(ScoringPoint point, IReadOnlyList<TracePoint> trace,
+        int entry, double zoneDirDeg, double halfAngleDeg)
+    {
+        int best = entry;
+        double bestDist = DistanceKm(point, trace[entry]);
+        for (int i = entry + 1; i < trace.Count; i++)
+        {
+            if (!InZone(point, trace[i], zoneDirDeg, halfAngleDeg))
+            {
+                break; // left the zone; this visit ends
+            }
+
+            double d = DistanceKm(point, trace[i]);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = i;
+            }
+        }
+
+        return best;
+    }
 
     /// <summary>First fix at or after <paramref name="from"/> inside the point's barrel circle.</summary>
     private static int FindBarrelEntry(ScoringPoint point, IReadOnlyList<TracePoint> trace, int from)
