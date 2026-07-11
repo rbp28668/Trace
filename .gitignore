@@ -7,6 +7,14 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/Dotnet.gitignore
 
+# Drawio backup
+*.bkp
+
+# Visual studio
+.vs
+
+
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
