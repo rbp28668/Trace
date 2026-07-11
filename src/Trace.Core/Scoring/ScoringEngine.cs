@@ -95,18 +95,8 @@ public class ScoringEngine
             }
 
             achieved = p;
+            searchFrom = entry;
             finishTime = trace[entry].When;
-
-            // The finish (last point) is only "arrived at" once the previous point
-            // has actually been TURNED, not merely clipped: a wide observation
-            // sector can be entered while transiting toward the finish (start and
-            // finish often share the last turnpoint's approach). So search the
-            // finish from the last turnpoint's closest-approach fix — the turn —
-            // rather than from where its sector was first entered.
-            bool nextIsFinish = p + 1 == pts.Count - 1;
-            searchFrom = nextIsFinish
-                ? NearestFixInZone(pts[p], trace, entry, ZoneDirection(pts, p), EffectiveHalfAngle(pts, p))
-                : entry;
         }
 
         // 3a. Case A — finisher.
@@ -315,34 +305,6 @@ public class ScoringEngine
     /// <summary>Sector half-angle to use at point <paramref name="i"/> (its own).</summary>
     private static double EffectiveHalfAngle(IReadOnlyList<ScoringPoint> pts, int i)
         => pts[i].SectorHalfAngleDeg;
-
-    /// <summary>
-    /// The closest-approach fix of the zone visit that begins at
-    /// <paramref name="entry"/>: from the entry, advance while the trace stays in
-    /// the zone and return the nearest fix. This marks where the point was turned.
-    /// </summary>
-    private static int NearestFixInZone(ScoringPoint point, IReadOnlyList<TracePoint> trace,
-        int entry, double zoneDirDeg, double halfAngleDeg)
-    {
-        int best = entry;
-        double bestDist = DistanceKm(point, trace[entry]);
-        for (int i = entry + 1; i < trace.Count; i++)
-        {
-            if (!InZone(point, trace[i], zoneDirDeg, halfAngleDeg))
-            {
-                break; // left the zone; this visit ends
-            }
-
-            double d = DistanceKm(point, trace[i]);
-            if (d < bestDist)
-            {
-                bestDist = d;
-                best = i;
-            }
-        }
-
-        return best;
-    }
 
     /// <summary>First fix at or after <paramref name="from"/> inside the point's barrel circle.</summary>
     private static int FindBarrelEntry(ScoringPoint point, IReadOnlyList<TracePoint> trace, int from)
