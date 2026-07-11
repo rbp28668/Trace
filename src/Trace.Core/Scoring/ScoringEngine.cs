@@ -62,9 +62,10 @@ public class ScoringEngine
         //    before it; this also avoids the return-to-start finish (start and
         //    finish often share an airfield). A line start is timed at the line
         //    crossing; a cylinder start at the zone exit.
-        int firstTpEntry = pts.Count > 1
-            ? FindZoneEntry(pts[1], trace, 0, ZoneDirection(pts, 1), EffectiveHalfAngle(pts, 1))
-            : -1;
+        // Anchor the start search on the first arrival at the first turnpoint's
+        // BARREL — a tight, direction-independent circle — not its wide observation
+        // sector, which would make the start window depend on sector orientation.
+        int firstTpEntry = pts.Count > 1 ? FindBarrelEntry(pts[1], trace, 0) : -1;
         ScoringPoint startPoint = pts[0];
         int startFixIndex = startPoint.IsLine && pts.Count > 1
             ? FindStartLineCrossing(startPoint, pts[1], trace, firstTpEntry)
@@ -303,6 +304,20 @@ public class ScoringEngine
     /// <summary>Sector half-angle to use at point <paramref name="i"/> (its own).</summary>
     private static double EffectiveHalfAngle(IReadOnlyList<ScoringPoint> pts, int i)
         => pts[i].SectorHalfAngleDeg;
+
+    /// <summary>First fix at or after <paramref name="from"/> inside the point's barrel circle.</summary>
+    private static int FindBarrelEntry(ScoringPoint point, IReadOnlyList<TracePoint> trace, int from)
+    {
+        for (int i = from; i < trace.Count; i++)
+        {
+            if (DistanceKm(point, trace[i]) <= point.RadiusKm)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 
     /// <summary>Angular bisector (deg true) of two bearings.</summary>
     private static double Bisector(double a, double b)
