@@ -42,7 +42,7 @@
       "102":[5.7,262.0,256.9],"101":[6.2,259.1,256.5],"100":[6.6,256.7,256.7],"99":[7.0,254.4,257.0],
       "98":[7.5,251.4,256.6],"97":[7.9,249.1,256.8],"96":[8.3,246.7,257.0],"95":[8.8,243.8,256.6]
     },
-    "_results_comment": "Two DAY2 caveats: (1) the SoaringSpot comp-number column came back garbled via WebFetch, so results are keyed by pilot name resolved to comp number via the entrants list. (2) The published finisher distance 292.50 is ~task length, NOT the sheet's H114 Hcp Dist of 256.8 (a ~36 km gap, unlike every other day where dref ~= Hcp Dist). DAY2 may have been scored on a different distance basis; verify the dref before trusting DAY2 speed comparisons.",
+    "_results_comment": "The SoaringSpot comp-number column came back garbled via WebFetch, so results are keyed by pilot name resolved to comp number via the entrants list. Note the published finisher distance 292.50 is ~task length, not the sheet's H114 Hcp Dist of 256.8 (unlike other days) — but the runner reproduces all 23 finishers to <=0.07 km/h with dref=292.50, so 292.50 is the correct scoring distance.",
     "results": {
       "841":{"h":104,"dist":292.50,"speed":132.45,"points":883},
       "V11":{"h":109.5,"dist":292.50,"speed":129.24,"points":847},
