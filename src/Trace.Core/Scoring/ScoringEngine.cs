@@ -265,10 +265,10 @@ public class ScoringEngine
     /// <summary>
     /// Direction (deg true) the observation sector at point <paramref name="i"/>
     /// is bisected by, per its <see cref="ZoneStyle"/>. A symmetric sector opens
-    /// INWARD, toward the course — along the bisector of the bearings to the two
-    /// neighbouring points — as shown by the SeeYou Observation Zone preview
-    /// (docs/simple_task_turnpoint.png / _checkpoint.png). Directional styles face
-    /// the relevant neighbour. Returns 0 for a full-circle zone (direction unused).
+    /// OUTWARD, away from the course — the reverse of the bisector of the bearings
+    /// to the two neighbouring points, so it faces away from both legs (dht.md
+    /// §4.2). Directional styles face the relevant neighbour. Returns 0 for a
+    /// full-circle zone (direction unused).
     /// </summary>
     private static double ZoneDirection(IReadOnlyList<ScoringPoint> pts, int i)
     {
@@ -292,10 +292,11 @@ public class ScoringEngine
             default:
                 if (toPrev is double a && toNext is double b)
                 {
-                    // Symmetric sector opens INWARD, toward the course: along the
-                    // bisector of the bearings to the two neighbours (confirmed by
-                    // the SeeYou Observation Zone preview, docs/simple_task_*.png).
-                    return Bisector(a, b);
+                    // Symmetric sector opens OUTWARD, away from the course: the
+                    // reverse of the inward bisector of the bearings to the two
+                    // neighbours, so it faces away from both legs (dht.md §4.2,
+                    // ObservationZone SeeYou convention).
+                    return Geodesy.Normalize360(Bisector(a, b) + 180.0);
                 }
 
                 return toPrev ?? toNext ?? 0.0;

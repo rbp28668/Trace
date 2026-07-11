@@ -11,6 +11,7 @@ using Trace.Io;
 using Trace.Model;
 using Trace.Planning;
 using Trace.Planner;
+using Trace.Rendering;
 
 try
 {
@@ -56,6 +57,23 @@ try
 
     Directory.CreateDirectory(parsed.OutDir);
     PlanWriter.WriteAll(parsed.OutDir, course, plan);
+
+    // Optional fleet-overview SVG: the task as set — fixed sectors plus the
+    // original CUP barrels (R2), so the turnpoint barrels are visually obvious
+    // rather than collapsed to R_min. One diagram for the whole task.
+    if (parsed.SvgPath is not null)
+    {
+        string svg = TaskDiagram.Render(course,
+            string.IsNullOrEmpty(course.Description) ? "Task" : course.Description);
+        string? dir = Path.GetDirectoryName(parsed.SvgPath);
+        if (!string.IsNullOrEmpty(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        File.WriteAllText(parsed.SvgPath, svg);
+        Console.WriteLine($"Wrote task diagram: {parsed.SvgPath}");
+    }
 
     return 0;
 }
