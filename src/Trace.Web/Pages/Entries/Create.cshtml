@@ -5,40 +5,56 @@
 }
 
 <h1>New entry — @Model.Class!.Name</h1>
+<p class="text-muted">Enter the glider and the pilot(s) who may fly it this competition. The first pilot is the primary (P1). Loggers can be added after the entry is created.</p>
 
-@if (!Model.GliderOptions.Any())
-{
-    <div class="alert alert-warning">
-        No unentered gliders left in this class.
-        <a asp-page="/Gliders/Create" asp-route-classId="@Model.ClassId" class="alert-link">Add a glider</a> first.
-    </div>
-}
-
-<form method="post" class="col-md-6">
+<form method="post" class="col-md-8">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
     <input type="hidden" asp-for="ClassId" />
-    <div class="mb-3">
-        <label asp-for="GliderId" class="form-label">Glider</label>
-        <select asp-for="GliderId" asp-items="Model.GliderOptions" class="form-select">
-            <option value="">— choose —</option>
-        </select>
-        <span asp-validation-for="GliderId" class="text-danger"></span>
+
+    <h2 class="h5 mt-2">Glider</h2>
+    <div class="row g-2 mb-3">
+        <div class="col-md-3">
+            <label asp-for="CompNo" class="form-label"></label>
+            <input asp-for="CompNo" class="form-control" />
+            <span asp-validation-for="CompNo" class="text-danger"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="Type" class="form-label"></label>
+            <input asp-for="Type" class="form-control" />
+            <span asp-validation-for="Type" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="Registration" class="form-label"></label>
+            <input asp-for="Registration" class="form-control" />
+            <span asp-validation-for="Registration" class="text-danger"></span>
+        </div>
+        <div class="col-md-2">
+            <label asp-for="Handicap" class="form-label"></label>
+            <input asp-for="Handicap" class="form-control" />
+            <span asp-validation-for="Handicap" class="text-danger"></span>
+        </div>
     </div>
-    <div class="mb-3">
-        <label asp-for="PilotId" class="form-label">Pilot</label>
-        <select asp-for="PilotId" asp-items="Model.PilotOptions" class="form-select">
-            <option value="">— choose —</option>
-        </select>
-        <span asp-validation-for="PilotId" class="text-danger"></span>
+
+    <h2 class="h5">Pilots</h2>
+    @for (int i = 0; i < Trace.Web.Pages.Entries.CreateModel.PilotSlots; i++)
+    {
+        var selected = i < Model.PilotIds.Length ? Model.PilotIds[i] : null;
+        <div class="mb-2">
+            <label class="form-label">@(i == 0 ? "Primary (P1)" : $"Pilot {i + 1} (optional)")</label>
+            <select name="PilotIds[@i]" class="form-select">
+                <option value="">— none —</option>
+                @foreach (var p in Model.Pilots)
+                {
+                    <option value="@p.Id" selected="@(selected == p.Id)">@p.Name</option>
+                }
+            </select>
+        </div>
+    }
+
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary">Create</button>
+        <a asp-page="Index" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Cancel</a>
     </div>
-    <div class="mb-3">
-        <label asp-for="P2PilotId" class="form-label">P2 (optional)</label>
-        <select asp-for="P2PilotId" asp-items="Model.PilotOptions" class="form-select">
-            <option value="">— none —</option>
-        </select>
-    </div>
-    <button type="submit" class="btn btn-primary">Create</button>
-    <a asp-page="Index" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Cancel</a>
 </form>
 
 @section Scripts {

@@ -332,11 +332,18 @@ Worked example, Cloud Rally DAY1 (WGS84 distances):
 
 ## 10. Branch / git state
 
-- Branch `feature/task-diagrams-outward-sectors`, pushed to `origin`.
-- Recent commit sequence on this branch:
-  1. Symmetric sectors open outward; add task-diagram SVG renderer + Planner `--svg`.
-  2. Uniform barrel radius per handicap; emit the task-sheet Variable Barrel Sizes table.
-  3. Switch `Geodesy` to WGS84 (Vincenty) — closes the ~0.3% distance gap.
-  4. (this) handover doc update.
+- Branch `feature/data-management-app` (web-app work; the engine is unchanged this
+  round). The prior `feature/task-diagrams-outward-sectors` engine work is merged
+  to `main`.
+- Recent web-app work on this branch (detailed in
+  [`data-app-plan.md`](data-app-plan.md) §8):
+  1. Add data-management web app (`Trace.Data` + `Trace.Web`).
+  2. Entries reshaped to glider + ordered pilot roster (`EntryPilot`, `DayEntry`
+     P2); retired the standalone Fleet pages.
+  3. Turnpoint editor/import A2 column; per-competition waypoint list with a strict
+     task-editor dropdown; task-import waypoint validation.
+  4. Diagram "Refresh from edits"; task-sheet export (.docx) via OpenXML.
+  5. (this) doc update.
+- The engine and CLIs are untouched this round; the **84 `Trace.Tests` still pass**.
 - No open PR; create one at
-  https://github.com/rbp28668/Trace/pull/new/feature/task-diagrams-outward-sectors
+  https://github.com/rbp28668/Trace/pull/new/feature/data-management-app

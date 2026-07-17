@@ -68,7 +68,7 @@ else
         {
             <tr>
                 <td>@e.Glider!.CompNo</td>
-                <td>@e.Pilot!.Name</td>
+                <td>@e.Pilot!.Name@(e.P2Pilot is null ? "" : $" / {e.P2Pilot.Name}")</td>
                 <td class="text-end">@e.Glider!.Handicap</td>
                 <td>
                     @if (e.Flight?.IgcFile is not null)

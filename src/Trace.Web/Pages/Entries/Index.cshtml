@@ -17,18 +17,18 @@
 
 <p>
     <a asp-page="Create" asp-route-classId="@Model.Class.Id" class="btn btn-primary">New entry</a>
-    <a asp-page="/Gliders/Index" asp-route-classId="@Model.Class.Id" class="btn btn-outline-secondary">Fleet</a>
+    <a asp-page="/Gliders/Import" asp-route-classId="@Model.Class.Id" class="btn btn-outline-primary">Import CSV</a>
 </p>
 
 @if (!Model.Entries.Any())
 {
-    <div class="alert alert-info">No entries yet. Pair a pilot with a glider to create one.</div>
+    <div class="alert alert-info">No entries yet. Add a glider and its pilot(s), or import an entrants CSV.</div>
 }
 else
 {
     <table class="table table-striped">
         <thead>
-            <tr><th>Glider</th><th>Type</th><th>Pilot</th><th>P2</th><th></th></tr>
+            <tr><th>Glider</th><th>Type</th><th class="text-end">Handicap</th><th>Pilots</th><th></th></tr>
         </thead>
         <tbody>
         @foreach (var en in Model.Entries)
@@ -36,8 +36,8 @@ else
             <tr>
                 <td>@en.Glider!.CompNo</td>
                 <td>@en.Glider!.Type</td>
-                <td>@en.Pilot!.Name</td>
-                <td>@en.P2Pilot?.Name</td>
+                <td class="text-end">@en.Glider!.Handicap</td>
+                <td>@string.Join(", ", en.Pilots.OrderBy(p => p.Order).Select(p => p.Pilot!.Name))</td>
                 <td class="text-end">
                     <a asp-page="Edit" asp-route-id="@en.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
                     <form method="post" asp-page-handler="Delete" asp-route-id="@en.Id"

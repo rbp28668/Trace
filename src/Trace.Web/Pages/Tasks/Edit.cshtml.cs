@@ -15,6 +15,7 @@ public class TurnpointRow
     public double Radius1 { get; set; }
     public double Angle1 { get; set; } = 180;
     public double Radius2 { get; set; }
+    public double Angle2 { get; set; }
     public bool IsLine { get; set; }
     public bool IsCheckpoint { get; set; }
     public int Style { get; set; } = 1;
@@ -24,11 +25,13 @@ public class EditModel : PageModel
 {
     private readonly TaskService tasks;
     private readonly PlanningService planning;
+    private readonly WaypointService waypoints;
 
-    public EditModel(TaskService tasks, PlanningService planning)
+    public EditModel(TaskService tasks, PlanningService planning, WaypointService waypoints)
     {
         this.tasks = tasks;
         this.planning = planning;
+        this.waypoints = waypoints;
     }
 
     [BindProperty]
@@ -57,9 +60,13 @@ public class EditModel : PageModel
 
     public int DayId { get; private set; }
     public int ClassId { get; private set; }
+    public int CompetitionId { get; private set; }
     public double? DRefKm { get; private set; }
     public double? TRefSec { get; private set; }
     public IReadOnlyList<double> PlannedHandicaps { get; private set; } = [];
+
+    /// <summary>The competition's waypoint list; turnpoint names are constrained to it.</summary>
+    public IReadOnlyList<CompetitionWaypoint> Waypoints { get; private set; } = [];
 
     public async Task<IActionResult> OnGetAsync(int id)
     {
@@ -70,6 +77,7 @@ public class EditModel : PageModel
         }
 
         Load(t);
+        await LoadWaypointsAsync(t);
         PlannedHandicaps = await planning.PlannedHandicapsAsync(t.Id);
         Turnpoints = t.Turnpoints
             .OrderBy(tp => tp.Index)
@@ -81,6 +89,7 @@ public class EditModel : PageModel
                 Radius1 = tp.Radius1,
                 Angle1 = tp.Angle1,
                 Radius2 = tp.Radius2,
+                Angle2 = tp.Angle2,
                 IsLine = tp.IsLine,
                 IsCheckpoint = tp.IsCheckpoint,
                 Style = tp.Style,
@@ -97,6 +106,30 @@ public class EditModel : PageModel
             return NotFound();
         }
 
+        await LoadWaypointsAsync(t);
+
+        // Coordinates come from the chosen waypoint, not the posted lat/lon: the
+        // editor constrains names to the competition's list. Reject any name that
+        // isn't in it (e.g. a stale row after the waypoint file changed).
+        var byName = Waypoints.ToDictionary(w => w.Name, StringComparer.OrdinalIgnoreCase);
+        var nonBlank = Turnpoints
+            .Where(r => !string.IsNullOrWhiteSpace(r.Waypoint))
+            .ToList();
+        foreach (var r in nonBlank)
+        {
+            if (!byName.ContainsKey(r.Waypoint.Trim()))
+            {
+                ModelState.AddModelError(string.Empty,
+                    $"“{r.Waypoint}” is not a waypoint in this competition. Load it on the Waypoints page first.");
+            }
+        }
+
+        if (Waypoints.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty,
+                "This competition has no waypoints loaded. Load a .cup file on the Waypoints page before editing tasks.");
+        }
+
         if (!ModelState.IsValid)
         {
             LoadDisplay(t);
@@ -110,21 +143,26 @@ public class EditModel : PageModel
         t.RefHandicap = RefHandicap;
         await tasks.UpdateAsync(t);
 
-        // Drop blank rows (no waypoint name) then replace the set wholesale.
-        var kept = Turnpoints
-            .Where(r => !string.IsNullOrWhiteSpace(r.Waypoint))
-            .Select(r => new Turnpoint
+        // Drop blank rows (no waypoint name) then replace the set wholesale,
+        // taking lat/lon from the resolved waypoint.
+        var kept = nonBlank
+            .Select(r =>
             {
-                Waypoint = r.Waypoint.Trim(),
-                Latitude = r.Latitude,
-                Longitude = r.Longitude,
-                Radius1 = r.Radius1,
-                Angle1 = r.Angle1,
-                Radius2 = r.Radius2,
-                IsLine = r.IsLine,
-                IsCheckpoint = r.IsCheckpoint,
-                Style = r.Style,
-                DirectionType = r.Style,
+                CompetitionWaypoint wp = byName[r.Waypoint.Trim()];
+                return new Turnpoint
+                {
+                    Waypoint = wp.Name,
+                    Latitude = wp.Latitude,
+                    Longitude = wp.Longitude,
+                    Radius1 = r.Radius1,
+                    Angle1 = r.Angle1,
+                    Radius2 = r.Radius2,
+                    Angle2 = r.Angle2,
+                    IsLine = r.IsLine,
+                    IsCheckpoint = r.IsCheckpoint,
+                    Style = r.Style,
+                    DirectionType = r.Style,
+                };
             })
             .ToList();
 
@@ -169,6 +207,76 @@ public class EditModel : PageModel
         return Content(svg, "image/svg+xml");
     }
 
+    /// <summary>
+    /// Renders the task diagram from the current (unsaved) form state, so an
+    /// editor can preview edits before saving. Coordinates are resolved from the
+    /// competition's waypoint list, matching the save path.
+    /// </summary>
+    public async Task<IActionResult> OnPostDiagramPreviewAsync()
+    {
+        var t = await tasks.GetAsync(Id);
+        if (t is null)
+        {
+            return NotFound();
+        }
+
+        await LoadWaypointsAsync(t);
+        var byName = Waypoints.ToDictionary(w => w.Name, StringComparer.OrdinalIgnoreCase);
+
+        var tps = Turnpoints
+            .Where(r => !string.IsNullOrWhiteSpace(r.Waypoint) &&
+                        byName.ContainsKey(r.Waypoint.Trim()))
+            .Select(r =>
+            {
+                CompetitionWaypoint wp = byName[r.Waypoint.Trim()];
+                return new Turnpoint
+                {
+                    Waypoint = wp.Name,
+                    Latitude = wp.Latitude,
+                    Longitude = wp.Longitude,
+                    Radius1 = r.Radius1,
+                    Angle1 = r.Angle1,
+                    Radius2 = r.Radius2,
+                    Angle2 = r.Angle2,
+                    IsLine = r.IsLine,
+                    IsCheckpoint = r.IsCheckpoint,
+                    Style = r.Style,
+                    DirectionType = r.Style,
+                };
+            })
+            .ToList();
+
+        string? svg = planning.RenderDiagramForTurnpoints(
+            string.IsNullOrWhiteSpace(Name) ? t.Name : Name, tps);
+        if (svg is null)
+        {
+            return Content(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"40\">" +
+                "<text x=\"4\" y=\"24\" font-family=\"sans-serif\" font-size=\"14\">" +
+                "Add at least two turnpoints.</text></svg>",
+                "image/svg+xml");
+        }
+
+        return Content(svg, "image/svg+xml");
+    }
+
+    public async Task<IActionResult> OnPostTaskSheetAsync()
+    {
+        byte[]? docx = await planning.ExportTaskSheetDocxAsync(Id);
+        if (docx is null)
+        {
+            TempData["Flash"] = "Run the planner before exporting the task sheet.";
+            return RedirectToPage("Edit", new { id = Id });
+        }
+
+        var t = await tasks.GetAsync(Id);
+        string safe = string.Concat((t?.Name ?? $"task_{Id}")
+            .Select(c => char.IsLetterOrDigit(c) ? c : '_'));
+        return File(docx,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            $"{safe}_task_sheet.docx");
+    }
+
     public async Task<IActionResult> OnPostExportAsync(int handicap100)
     {
         // Handicap is passed ×100 as an int to keep the route value exact.
@@ -202,5 +310,12 @@ public class EditModel : PageModel
         ClassId = t.CompetitionClassId;
         DRefKm = t.DRefKm;
         TRefSec = t.TRefSec;
+    }
+
+    /// <summary>Loads the competition's waypoint list (via the task's class).</summary>
+    private async System.Threading.Tasks.Task LoadWaypointsAsync(CompetitionTask t)
+    {
+        CompetitionId = t.CompetitionClass!.CompetitionId;
+        Waypoints = await waypoints.ListForCompetitionAsync(CompetitionId);
     }
 }

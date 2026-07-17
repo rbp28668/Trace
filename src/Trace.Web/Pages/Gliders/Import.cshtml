@@ -26,7 +26,7 @@
             <textarea asp-for="Csv" class="form-control" rows="8"></textarea>
         </div>
         <button type="submit" class="btn btn-primary">Preview</button>
-        <a asp-page="Index" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Cancel</a>
+        <a asp-page="/Entries/Index" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Cancel</a>
     </form>
 }
 else

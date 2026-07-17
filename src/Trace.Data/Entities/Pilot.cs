@@ -13,5 +13,6 @@ public class Pilot
     /// <summary>BGA / competition account number.</summary>
     public int? AccountNo { get; set; }
 
-    public List<CompetitionEntry> Entries { get; set; } = new();
+    /// <summary>Competition-entry roster memberships (this pilot on entries).</summary>
+    public List<EntryPilot> Entries { get; set; } = new();
 }

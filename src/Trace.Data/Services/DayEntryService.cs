@@ -16,6 +16,7 @@ public class DayEntryService
     public Task<List<DayEntry>> ListAsync(int dayId, int classId) =>
         db.DayEntries
             .Include(e => e.Pilot)
+            .Include(e => e.P2Pilot)
             .Include(e => e.Glider)
             .Include(e => e.Flight)!.ThenInclude(f => f!.IgcFile)
             .Where(e => e.DayId == dayId && e.CompetitionClassId == classId)
@@ -25,6 +26,7 @@ public class DayEntryService
     public Task<DayEntry?> GetAsync(int id) =>
         db.DayEntries
             .Include(e => e.Pilot)
+            .Include(e => e.P2Pilot)
             .Include(e => e.Glider)
             .Include(e => e.Flight)!.ThenInclude(f => f!.IgcFile)
             .FirstOrDefaultAsync(e => e.Id == id);
@@ -42,23 +44,36 @@ public class DayEntryService
             .ToListAsync();
 
         List<CompetitionEntry> entries = await db.CompetitionEntries
+            .Include(en => en.Pilots.OrderBy(p => p.Order))
             .Where(en => en.CompetitionClassId == classId &&
                          !existingGliders.Contains(en.GliderId))
             .ToListAsync();
 
+        int created = 0;
         foreach (CompetitionEntry en in entries)
         {
+            // Seed the day with the entry's roster: primary pilot (order 0), and
+            // the second pilot as P2 when the entry is a two-crew glider. The user
+            // edits who actually flew afterwards.
+            EntryPilot? primary = en.Pilots.FirstOrDefault();
+            if (primary is null)
+            {
+                continue; // an entry with no pilots yet can't seed a day flight
+            }
+
             db.DayEntries.Add(new DayEntry
             {
                 DayId = dayId,
                 CompetitionClassId = classId,
-                PilotId = en.PilotId,
+                PilotId = primary.PilotId,
+                P2PilotId = en.Pilots.Skip(1).FirstOrDefault()?.PilotId,
                 GliderId = en.GliderId,
             });
+            created++;
         }
 
         await db.SaveChangesAsync();
-        return entries.Count;
+        return created;
     }
 
     public async System.Threading.Tasks.Task DeleteAsync(int id)

@@ -1,0 +1,69 @@
+@page
+@model Trace.Web.Pages.Waypoints.IndexModel
+@{
+    ViewData["Title"] = "Waypoints";
+    var comp = Model.Competition!;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-page="/Competitions/Index">Competitions</a></li>
+        <li class="breadcrumb-item"><a asp-page="/Competitions/Index">@comp.Name</a></li>
+        <li class="breadcrumb-item active">Waypoints</li>
+    </ol>
+</nav>
+
+<h1>Waypoints — @comp.Name</h1>
+<p class="text-muted">
+    Load the competition's waypoints from a SeeYou <code>.cup</code> file. Task
+    turnpoints are constrained to this list, taking their coordinates from the
+    chosen waypoint. Uploading replaces the current list.
+</p>
+
+<form method="post" asp-page-handler="Upload" enctype="multipart/form-data" class="col-md-8 mb-4">
+    <div asp-validation-summary="All" class="text-danger"></div>
+    <input type="hidden" asp-for="CompetitionId" />
+    <div class="mb-3">
+        <label asp-for="Upload" class="form-label">Upload .cup file</label>
+        <input asp-for="Upload" type="file" accept=".cup,text/plain" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="Cup" class="form-label">…or paste .cup text</label>
+        <textarea asp-for="Cup" class="form-control" rows="6"></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Load waypoints</button>
+    <a asp-page="/Days/Index" asp-route-competitionId="@comp.Id" class="btn btn-secondary">Back</a>
+</form>
+
+@if (!Model.Waypoints.Any())
+{
+    <div class="alert alert-info">No waypoints loaded yet.</div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center">
+        <h2 class="h5">@Model.Waypoints.Count waypoint(s)</h2>
+        <form method="post" asp-page-handler="Clear"
+              onsubmit="return confirm('Clear all waypoints for this competition?');">
+            <input type="hidden" asp-for="CompetitionId" />
+            <button type="submit" class="btn btn-sm btn-outline-danger">Clear all</button>
+        </form>
+    </div>
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr><th>Name</th><th>Code</th><th class="text-end">Lat</th><th class="text-end">Lon</th><th class="text-end">Elev (m)</th></tr>
+        </thead>
+        <tbody>
+        @foreach (var w in Model.Waypoints)
+        {
+            <tr>
+                <td>@w.Name</td>
+                <td>@w.Code</td>
+                <td class="text-end">@w.Latitude.ToString("F5")</td>
+                <td class="text-end">@w.Longitude.ToString("F5")</td>
+                <td class="text-end">@w.ElevationM.ToString("F0")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

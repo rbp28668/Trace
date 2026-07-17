@@ -86,7 +86,7 @@ public class ImportModel : PageModel
 
         int n = await import.CommitAsync(ClassId, rows);
         TempData["Flash"] = $"Imported {n} glider(s).";
-        return RedirectToPage("Index", new { classId = ClassId });
+        return RedirectToPage("/Entries/Index", new { classId = ClassId });
     }
 
     private async Task<string> ReadInputAsync()

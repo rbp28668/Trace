@@ -11,6 +11,7 @@ builder.Services.AddDbContext<TraceDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Trace")));
 
 builder.Services.AddScoped<CompetitionService>();
+builder.Services.AddScoped<WaypointService>();
 builder.Services.AddScoped<ClassService>();
 builder.Services.AddScoped<FleetService>();
 builder.Services.AddScoped<FleetImportService>();

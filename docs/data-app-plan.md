@@ -269,6 +269,47 @@ Following review feedback:
 - Re-verified end-to-end: hub CRUD works, and planning still reproduces the
   validated H95 barrel (8811 m) reading VRefCru from the class; 84 tests pass.
 
+### Data-model & task-sheet round (branch `feature/data-management-app`) ✅ *(done)*
+Feature work after the initial app commit; migrations applied to the dev DB and
+all 84 `Trace.Tests` still pass. Verified end-to-end in the running app.
+
+- **Entries reshaped: glider + ordered pilot roster.** The old "Fleet" concept
+  (a standalone `Gliders` page) is gone. A `CompetitionEntry` is now a glider plus
+  an **ordered roster of one or more pilots** (join entity `EntryPilot`, `Order` 0
+  = primary/P1); `DayEntry` gained an optional `P2PilotId` so a day flight can be
+  flown by 1 (max 2) of the roster. The entry Create/Edit screen owns the glider
+  fields, the pilot roster, and loggers (the retired Fleet pages folded in).
+  Deleting an entry also deletes its glider unless a `DayEntry` still references it.
+  Migration `EntryPilotRosterAndDayP2` (copies old primary→order 0, P2→order 1
+  before dropping the columns). Files: `CompetitionEntry`, `EntryPilot`, `DayEntry`,
+  `Pilot` entities; `EntryService.SetPilotsAsync`; `Pages/Entries/*`.
+- **Turnpoint editor: A2 column.** `Tasks/Edit` had A1 but no A2, and `TurnpointRow`
+  didn't carry `Angle2` — so every save silently zeroed the DB column. Added the
+  A2 (°) column through the whole path (row model, load, save, add-row JS) and to
+  the `Tasks/Import` preview. The CUP importer already mapped A2 correctly; the loss
+  was editor-only.
+- **Per-competition waypoint list.** New `CompetitionWaypoint` entity + `Waypoints`
+  page per competition (upload a `.cup`, parsed by the existing `CupReader`,
+  de-duped by name; migration `CompetitionWaypoints`). The task editor's Waypoint
+  field is now a **strict dropdown** constrained to that list, with read-only
+  lat/lon resolved from the chosen waypoint on save (JS fills them live). The CUP
+  **task** importer also resolves/validates turnpoint names against the list and
+  refuses to import off-list names. Files: `WaypointService`, `Pages/Waypoints/*`,
+  `Pages/Tasks/Edit`, `Pages/Tasks/Import`.
+- **Diagram "Refresh from edits".** A button on `Tasks/Edit` re-renders the task
+  diagram from the current (unsaved) form state via a POST handler
+  (`OnPostDiagramPreviewAsync` → `PlanningService.RenderDiagramForTurnpoints`, no
+  DB write), resolving coords from the waypoint list exactly like the save path.
+- **Task sheet export (.docx).** New `TaskSheetDocx` (OpenXML;
+  `DocumentFormat.OpenXml` added to `Trace.Data`) reproduces the DHT task-sheet
+  layout from `data/CR2025_racer1.tif`: header, points table
+  (Code/Name/Lat/Lon/Course/Dist/Type/Radius with WGS84 bearings & leg distances),
+  the "Variable Barrel Sizes" table, and a Task Properties block. Notes / ATC
+  frequencies / licensee are **editable placeholders** (no schema change). Gated on
+  the task being **planned** (stored barrels); button on `Tasks/Edit` next to the
+  `.cup` exports. `PlanningService` refactored so `ComputePlanAsync` is shared by
+  `PlanAsync` and the sheet, so the barrel table always matches the stored plan.
+
 ## 9. Open items to confirm later
 
 - **IGC storage** — DB bytea vs. filesystem path (large logs). Default: filesystem

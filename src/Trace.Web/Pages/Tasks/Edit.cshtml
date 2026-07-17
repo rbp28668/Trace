@@ -6,7 +6,7 @@
 
 <h1>Edit task</h1>
 
-<form method="post">
+<form method="post" id="taskForm">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
     <input type="hidden" asp-for="Id" />
 
@@ -50,7 +50,8 @@
         <button type="submit" asp-page-handler="Plan" class="btn btn-outline-primary btn-sm">Run planner</button>
         @if (Model.PlannedHandicaps.Any())
         {
-            <span class="ms-2">Export:</span>
+            <button type="submit" asp-page-handler="TaskSheet" class="btn btn-outline-success btn-sm ms-2">Task sheet (.docx)</button>
+            <span class="ms-2">Export .cup:</span>
             @foreach (var h in Model.PlannedHandicaps)
             {
                 <button type="submit" asp-page-handler="Export" asp-route-handicap100="@((int)Math.Round(h * 100))"
@@ -60,11 +61,20 @@
     </fieldset>
 
     <h2 class="h5">Turnpoints</h2>
+    @if (!Model.Waypoints.Any())
+    {
+        <div class="alert alert-warning">
+            This competition has no waypoints loaded. Turnpoints are chosen from the
+            competition's waypoint list —
+            <a asp-page="/Waypoints/Index" asp-route-competitionId="@Model.CompetitionId" class="alert-link">load a .cup file</a>
+            before editing tasks.
+        </div>
+    }
     <table class="table table-sm" id="tpTable">
         <thead>
             <tr>
                 <th>#</th><th>Waypoint</th><th>Lat</th><th>Lon</th>
-                <th>R1 (km)</th><th>A1 (°)</th><th>R2 (km)</th>
+                <th>R1 (km)</th><th>A1 (°)</th><th>R2 (km)</th><th>A2 (°)</th>
                 <th>Line</th><th>Chk</th><th></th>
             </tr>
         </thead>
@@ -75,13 +85,20 @@
                 <td class="idx">@(i)</td>
                 <td>
                     <input type="hidden" name="Turnpoints[@i].Style" value="@Model.Turnpoints[i].Style" />
-                    <input name="Turnpoints[@i].Waypoint" value="@Model.Turnpoints[i].Waypoint" class="form-control form-control-sm" />
+                    <select name="Turnpoints[@i].Waypoint" class="form-select form-select-sm wpSelect" style="min-width:12rem">
+                        <option value="">— choose —</option>
+                        @foreach (var w in Model.Waypoints)
+                        {
+                            <option value="@w.Name" selected="@(w.Name == Model.Turnpoints[i].Waypoint)">@w.Name</option>
+                        }
+                    </select>
                 </td>
-                <td><input name="Turnpoints[@i].Latitude" value="@Model.Turnpoints[i].Latitude" class="form-control form-control-sm" style="width:8rem" /></td>
-                <td><input name="Turnpoints[@i].Longitude" value="@Model.Turnpoints[i].Longitude" class="form-control form-control-sm" style="width:8rem" /></td>
+                <td><input class="form-control form-control-sm wpLat" style="width:8rem" value="@Model.Turnpoints[i].Latitude.ToString("F5", System.Globalization.CultureInfo.InvariantCulture)" readonly /></td>
+                <td><input class="form-control form-control-sm wpLon" style="width:8rem" value="@Model.Turnpoints[i].Longitude.ToString("F5", System.Globalization.CultureInfo.InvariantCulture)" readonly /></td>
                 <td><input name="Turnpoints[@i].Radius1" value="@Model.Turnpoints[i].Radius1" class="form-control form-control-sm" style="width:6rem" /></td>
                 <td><input name="Turnpoints[@i].Angle1" value="@Model.Turnpoints[i].Angle1" class="form-control form-control-sm" style="width:5rem" /></td>
                 <td><input name="Turnpoints[@i].Radius2" value="@Model.Turnpoints[i].Radius2" class="form-control form-control-sm" style="width:6rem" /></td>
+                <td><input name="Turnpoints[@i].Angle2" value="@Model.Turnpoints[i].Angle2" class="form-control form-control-sm" style="width:5rem" /></td>
                 <td><input type="checkbox" name="Turnpoints[@i].IsLine" value="true" @(Model.Turnpoints[i].IsLine ? "checked" : "") /></td>
                 <td><input type="checkbox" name="Turnpoints[@i].IsCheckpoint" value="true" @(Model.Turnpoints[i].IsCheckpoint ? "checked" : "") /></td>
                 <td><button type="button" class="btn btn-sm btn-outline-danger removeRow">×</button></td>
@@ -89,7 +106,7 @@
         }
         </tbody>
     </table>
-    <p><button type="button" class="btn btn-outline-secondary btn-sm" id="addRow">Add turnpoint</button></p>
+    <p><button type="button" class="btn btn-outline-secondary btn-sm" id="addRow" @(Model.Waypoints.Any() ? "" : "disabled")>Add turnpoint</button></p>
 
     <button type="submit" class="btn btn-primary">Save task</button>
     <a asp-page="Index" asp-route-dayId="@Model.DayId" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Back</a>
@@ -112,8 +129,8 @@
 @{
     var diagramBase = Url.Page("Edit", "Diagram", new { id = Model.Id })!;
 }
-<div class="mb-2">
-    <label for="hcapSelect" class="form-label">Handicap:</label>
+<div class="mb-2 d-flex align-items-center gap-2">
+    <label for="hcapSelect" class="form-label mb-0">Handicap:</label>
     <select id="hcapSelect" class="form-select d-inline-block" style="width:auto;"
             onchange="updateDiagram()">
         <option value="">As set</option>
@@ -122,6 +139,8 @@
             <option value="@((int)Math.Round(h * 100))">H@(h.ToString("0.#"))</option>
         }
     </select>
+    <button type="button" class="btn btn-outline-primary btn-sm" id="refreshDiagram">Refresh from edits</button>
+    <span id="diagramNote" class="text-muted small"></span>
 </div>
 <div class="border rounded p-2 bg-white" style="overflow:auto;">
     <img id="taskDiagram" src="@diagramBase" alt="Task diagram" style="max-width:100%;" />
@@ -131,47 +150,103 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
+        // The competition's waypoints; turnpoint coordinates are derived from the
+        // chosen name (the server is authoritative — these only drive the display).
+        const waypoints = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.Waypoints.Select(w => new { name = w.Name, lat = w.Latitude, lon = w.Longitude })));
+        const wpByName = Object.fromEntries(waypoints.map(w => [w.name, w]));
+
+        function wpOptions(selected) {
+            return '<option value="">— choose —</option>' +
+                waypoints.map(w =>
+                    '<option value="' + w.name.replace(/"/g, '&quot;') + '"' +
+                    (w.name === selected ? ' selected' : '') + '>' + w.name + '</option>').join('');
+        }
+
+        // Reflect the chosen waypoint's coordinates into the read-only lat/lon cells.
+        function fillCoords(sel) {
+            const tr = sel.closest('tr');
+            const w = wpByName[sel.value];
+            tr.querySelector('.wpLat').value = w ? w.lat.toFixed(5) : '';
+            tr.querySelector('.wpLon').value = w ? w.lon.toFixed(5) : '';
+        }
+
         // Turnpoint rows use indexed names (Turnpoints[i].Field); after add/remove
         // we renumber so the model binder sees a contiguous list.
         function renumber() {
             document.querySelectorAll('#tpBody tr').forEach((tr, i) => {
                 tr.querySelector('.idx').textContent = i;
-                tr.querySelectorAll('input').forEach(inp => {
-                    inp.name = inp.name.replace(/Turnpoints\[\d+\]/, 'Turnpoints[' + i + ']');
+                tr.querySelectorAll('input, select').forEach(el => {
+                    if (el.name) {
+                        el.name = el.name.replace(/Turnpoints\[\d+\]/, 'Turnpoints[' + i + ']');
+                    }
                 });
             });
         }
-        document.getElementById('addRow').addEventListener('click', () => {
-            const body = document.getElementById('tpBody');
-            const i = body.querySelectorAll('tr').length;
-            const tr = document.createElement('tr');
-            tr.innerHTML =
-                '<td class="idx">' + i + '</td>' +
-                '<td><input type="hidden" name="Turnpoints[' + i + '].Style" value="1" />' +
-                '<input name="Turnpoints[' + i + '].Waypoint" class="form-control form-control-sm" /></td>' +
-                '<td><input name="Turnpoints[' + i + '].Latitude" value="0" class="form-control form-control-sm" style="width:8rem" /></td>' +
-                '<td><input name="Turnpoints[' + i + '].Longitude" value="0" class="form-control form-control-sm" style="width:8rem" /></td>' +
-                '<td><input name="Turnpoints[' + i + '].Radius1" value="0" class="form-control form-control-sm" style="width:6rem" /></td>' +
-                '<td><input name="Turnpoints[' + i + '].Angle1" value="180" class="form-control form-control-sm" style="width:5rem" /></td>' +
-                '<td><input name="Turnpoints[' + i + '].Radius2" value="0" class="form-control form-control-sm" style="width:6rem" /></td>' +
-                '<td><input type="checkbox" name="Turnpoints[' + i + '].IsLine" value="true" /></td>' +
-                '<td><input type="checkbox" name="Turnpoints[' + i + '].IsCheckpoint" value="true" /></td>' +
-                '<td><button type="button" class="btn btn-sm btn-outline-danger removeRow">×</button></td>';
-            body.appendChild(tr);
-        });
+        const addRow = document.getElementById('addRow');
+        if (addRow) {
+            addRow.addEventListener('click', () => {
+                const body = document.getElementById('tpBody');
+                const i = body.querySelectorAll('tr').length;
+                const tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td class="idx">' + i + '</td>' +
+                    '<td><input type="hidden" name="Turnpoints[' + i + '].Style" value="1" />' +
+                    '<select name="Turnpoints[' + i + '].Waypoint" class="form-select form-select-sm wpSelect" style="min-width:12rem">' + wpOptions('') + '</select></td>' +
+                    '<td><input class="form-control form-control-sm wpLat" style="width:8rem" readonly /></td>' +
+                    '<td><input class="form-control form-control-sm wpLon" style="width:8rem" readonly /></td>' +
+                    '<td><input name="Turnpoints[' + i + '].Radius1" value="0" class="form-control form-control-sm" style="width:6rem" /></td>' +
+                    '<td><input name="Turnpoints[' + i + '].Angle1" value="180" class="form-control form-control-sm" style="width:5rem" /></td>' +
+                    '<td><input name="Turnpoints[' + i + '].Radius2" value="0" class="form-control form-control-sm" style="width:6rem" /></td>' +
+                    '<td><input name="Turnpoints[' + i + '].Angle2" value="0" class="form-control form-control-sm" style="width:5rem" /></td>' +
+                    '<td><input type="checkbox" name="Turnpoints[' + i + '].IsLine" value="true" /></td>' +
+                    '<td><input type="checkbox" name="Turnpoints[' + i + '].IsCheckpoint" value="true" /></td>' +
+                    '<td><button type="button" class="btn btn-sm btn-outline-danger removeRow">×</button></td>';
+                body.appendChild(tr);
+            });
+        }
         document.getElementById('tpBody').addEventListener('click', e => {
             if (e.target.classList.contains('removeRow')) {
                 e.target.closest('tr').remove();
                 renumber();
             }
         });
+        document.getElementById('tpBody').addEventListener('change', e => {
+            if (e.target.classList.contains('wpSelect')) {
+                fillCoords(e.target);
+            }
+        });
 
-        // Task diagram: swap the SVG source when a handicap is chosen.
+        // Task diagram: swap the SVG source when a handicap is chosen. Selecting a
+        // handicap reflects the saved plan, so clear any unsaved-preview note.
         const diagramBase = "@Html.Raw(diagramBase)";
         function updateDiagram() {
             const h = document.getElementById('hcapSelect').value;
             const url = h ? diagramBase + (diagramBase.includes('?') ? '&' : '?') + 'handicap100=' + h : diagramBase;
             document.getElementById('taskDiagram').src = url;
+            document.getElementById('diagramNote').textContent = '';
         }
+
+        // Refresh the diagram from the current (unsaved) edits by posting the form
+        // to the DiagramPreview handler and swapping the image to the returned SVG.
+        const previewUrl = "@Html.Raw(Url.Page("Edit", "DiagramPreview", new { id = Model.Id })!)";
+        document.getElementById('refreshDiagram').addEventListener('click', async () => {
+            const note = document.getElementById('diagramNote');
+            note.textContent = 'Rendering…';
+            try {
+                const resp = await fetch(previewUrl, {
+                    method: 'POST',
+                    body: new FormData(document.getElementById('taskForm')),
+                });
+                if (!resp.ok) { throw new Error('HTTP ' + resp.status); }
+                const svg = await resp.text();
+                document.getElementById('taskDiagram').src =
+                    'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+                document.getElementById('hcapSelect').value = '';
+                note.textContent = 'Showing unsaved edits (as set). Save to keep them.';
+            } catch (e) {
+                note.textContent = 'Could not render: ' + e.message;
+            }
+        });
     </script>
 }

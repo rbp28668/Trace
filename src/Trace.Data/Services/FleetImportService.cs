@@ -108,8 +108,9 @@ public class FleetImportService
             db.Pilots.Add(pilot);
         }
 
-        // The entry is keyed by (class, glider); create it if the glider isn't
-        // yet entered. EF resolves the FK once the glider/pilot are saved.
+        // The entry is keyed by (class, glider). Create it with this pilot as the
+        // primary (order 0) if the glider isn't yet entered. EF resolves the FKs
+        // once the glider/pilot are saved.
         bool entered = glider.Id != 0 && await db.CompetitionEntries.AnyAsync(en =>
             en.CompetitionClassId == classId && en.GliderId == glider.Id);
         if (!entered)
@@ -118,7 +119,7 @@ public class FleetImportService
             {
                 CompetitionClassId = classId,
                 Glider = glider,
-                Pilot = pilot,
+                Pilots = { new EntryPilot { Pilot = pilot, Order = 0 } },
             });
         }
     }

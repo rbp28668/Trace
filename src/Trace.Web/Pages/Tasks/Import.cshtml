@@ -35,22 +35,50 @@
 else
 {
     <p><strong>@Model.Preview.Description</strong> — @Model.Preview.Turnpoints.Count turnpoint(s).</p>
+    <p class="text-muted">Coordinates are taken from the competition's waypoint list.</p>
+
+    var unmatched = new HashSet<string>(Model.UnmatchedNames, StringComparer.OrdinalIgnoreCase);
+    @if (!Model.HasWaypoints)
+    {
+        <div class="alert alert-warning">
+            This competition has no waypoints loaded.
+            <a asp-page="/Waypoints/Index" asp-route-competitionId="@Model.Class!.CompetitionId" class="alert-link">Load a .cup file</a>
+            before importing tasks.
+        </div>
+    }
+    else if (unmatched.Any())
+    {
+        <div class="alert alert-danger">
+            These turnpoints are not in the competition's waypoint list and must be
+            added before this task can be imported:
+            <strong>@string.Join(", ", Model.UnmatchedNames)</strong>.
+        </div>
+    }
+
     <table class="table table-sm table-striped">
         <thead>
-            <tr><th>#</th><th>Waypoint</th><th>Lat</th><th>Lon</th><th>R1 (km)</th><th>A1</th><th>R2 (km)</th><th>Line</th><th>Chk</th></tr>
+            <tr><th>#</th><th>Waypoint</th><th>Lat</th><th>Lon</th><th>R1 (km)</th><th>A1</th><th>R2 (km)</th><th>A2</th><th>Line</th><th>Chk</th></tr>
         </thead>
         <tbody>
         @for (int i = 0; i < Model.Preview.Turnpoints.Count; i++)
         {
             var tp = Model.Preview.Turnpoints[i];
-            <tr>
+            var isUnmatched = unmatched.Contains(tp.Waypoint);
+            <tr class="@(isUnmatched ? "table-danger" : "")">
                 <td>@i</td>
-                <td>@tp.Waypoint</td>
+                <td>
+                    @tp.Waypoint
+                    @if (isUnmatched)
+                    {
+                        <span class="badge bg-danger">not in list</span>
+                    }
+                </td>
                 <td>@tp.Latitude.ToString("F4")</td>
                 <td>@tp.Longitude.ToString("F4")</td>
                 <td>@tp.Radius1.ToString("F2")</td>
                 <td>@tp.Angle1.ToString("F0")</td>
                 <td>@tp.Radius2.ToString("F2")</td>
+                <td>@tp.Angle2.ToString("F0")</td>
                 <td>@(tp.IsLine ? "✓" : "")</td>
                 <td>@(tp.IsCheckpoint ? "✓" : "")</td>
             </tr>
@@ -59,11 +87,12 @@ else
     </table>
 
     <form method="post" asp-page-handler="Commit">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
         <input type="hidden" asp-for="DayId" />
         <input type="hidden" asp-for="ClassId" />
         <input type="hidden" asp-for="TaskType" />
         <input type="hidden" asp-for="TaskJson" />
-        <button type="submit" class="btn btn-primary">Import this task</button>
+        <button type="submit" class="btn btn-primary" disabled="@(!Model.HasWaypoints || unmatched.Any())">Import this task</button>
         <a asp-page="Import" asp-route-dayId="@Model.DayId" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Start over</a>
     </form>
 }

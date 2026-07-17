@@ -24,4 +24,7 @@ public class Competition
     public List<CompetitionClass> Classes { get; set; } = new();
 
     public List<Day> Days { get; set; } = new();
+
+    /// <summary>Waypoints loaded from the competition's uploaded .cup file.</summary>
+    public List<CompetitionWaypoint> Waypoints { get; set; } = new();
 }

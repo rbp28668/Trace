@@ -17,11 +17,13 @@ public class TraceDbContext : DbContext
     }
 
     public DbSet<Competition> Competitions => Set<Competition>();
+    public DbSet<CompetitionWaypoint> CompetitionWaypoints => Set<CompetitionWaypoint>();
     public DbSet<CompetitionClass> CompetitionClasses => Set<CompetitionClass>();
     public DbSet<Pilot> Pilots => Set<Pilot>();
     public DbSet<Glider> Gliders => Set<Glider>();
     public DbSet<Logger> Loggers => Set<Logger>();
     public DbSet<CompetitionEntry> CompetitionEntries => Set<CompetitionEntry>();
+    public DbSet<EntryPilot> EntryPilots => Set<EntryPilot>();
     public DbSet<Day> Days => Set<Day>();
     public DbSet<CompetitionTask> Tasks => Set<CompetitionTask>();
     public DbSet<Turnpoint> Turnpoints => Set<Turnpoint>();
@@ -51,6 +53,17 @@ public class TraceDbContext : DbContext
                 .WithOne(d => d.Competition!)
                 .HasForeignKey(d => d.CompetitionId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(c => c.Waypoints)
+                .WithOne(w => w.Competition!)
+                .HasForeignKey(w => w.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CompetitionWaypoint>(e =>
+        {
+            e.Property(w => w.Name).IsRequired().HasMaxLength(200);
+            e.Property(w => w.Code).HasMaxLength(50);
+            e.HasIndex(w => new { w.CompetitionId, w.Name }).IsUnique();
         });
 
         modelBuilder.Entity<CompetitionClass>(e =>
@@ -97,17 +110,24 @@ public class TraceDbContext : DbContext
         modelBuilder.Entity<CompetitionEntry>(e =>
         {
             e.HasIndex(en => new { en.CompetitionClassId, en.GliderId }).IsUnique();
-            e.HasOne(en => en.Pilot)
-                .WithMany(p => p.Entries)
-                .HasForeignKey(en => en.PilotId)
-                .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(en => en.Glider)
                 .WithMany()
                 .HasForeignKey(en => en.GliderId)
                 .OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(en => en.P2Pilot)
-                .WithMany()
-                .HasForeignKey(en => en.P2PilotId)
+            e.HasMany(en => en.Pilots)
+                .WithOne(ep => ep.CompetitionEntry!)
+                .HasForeignKey(ep => ep.CompetitionEntryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<EntryPilot>(e =>
+        {
+            // A pilot appears at most once per entry, at a defined position.
+            e.HasIndex(ep => new { ep.CompetitionEntryId, ep.PilotId }).IsUnique();
+            e.HasIndex(ep => new { ep.CompetitionEntryId, ep.Order }).IsUnique();
+            e.HasOne(ep => ep.Pilot)
+                .WithMany(p => p.Entries)
+                .HasForeignKey(ep => ep.PilotId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -165,6 +185,10 @@ public class TraceDbContext : DbContext
             e.HasOne(en => en.Pilot)
                 .WithMany()
                 .HasForeignKey(en => en.PilotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(en => en.P2Pilot)
+                .WithMany()
+                .HasForeignKey(en => en.P2PilotId)
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(en => en.Glider)
                 .WithMany()

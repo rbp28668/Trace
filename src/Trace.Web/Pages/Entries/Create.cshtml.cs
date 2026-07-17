@@ -1,7 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using Trace.Data.Entities;
 using Trace.Data.Services;
 
@@ -10,31 +9,44 @@ namespace Trace.Web.Pages.Entries;
 public class CreateModel : PageModel
 {
     private readonly EntryService entries;
+    private readonly FleetService fleet;
     private readonly ClassService classes;
     private readonly PilotService pilots;
 
-    public CreateModel(EntryService entries, ClassService classes, PilotService pilots)
+    public CreateModel(EntryService entries, FleetService fleet,
+        ClassService classes, PilotService pilots)
     {
         this.entries = entries;
+        this.fleet = fleet;
         this.classes = classes;
         this.pilots = pilots;
     }
 
+    /// <summary>Number of ordered pilot slots offered on the form (P1 is required).</summary>
+    public const int PilotSlots = 4;
+
     [BindProperty]
     public int ClassId { get; set; }
 
-    [BindProperty, Range(1, int.MaxValue, ErrorMessage = "Choose a glider.")]
-    public int GliderId { get; set; }
+    [BindProperty, Required, StringLength(10)]
+    [Display(Name = "Comp number")]
+    public string CompNo { get; set; } = string.Empty;
 
-    [BindProperty, Range(1, int.MaxValue, ErrorMessage = "Choose a pilot.")]
-    public int PilotId { get; set; }
+    [BindProperty, Required, StringLength(100)]
+    public string Type { get; set; } = string.Empty;
 
+    [BindProperty, StringLength(20)]
+    public string? Registration { get; set; }
+
+    [BindProperty, Range(1, 200)]
+    public double Handicap { get; set; } = 100;
+
+    /// <summary>Ordered pilot ids, one per slot; slot 0 is the primary (P1).</summary>
     [BindProperty]
-    public int? P2PilotId { get; set; }
+    public int?[] PilotIds { get; set; } = new int?[PilotSlots];
 
     public CompetitionClass? Class { get; private set; }
-    public SelectList GliderOptions { get; private set; } = default!;
-    public SelectList PilotOptions { get; private set; } = default!;
+    public IReadOnlyList<Pilot> Pilots { get; private set; } = [];
 
     public async Task<IActionResult> OnGetAsync(int classId)
     {
@@ -57,32 +69,62 @@ public class CreateModel : PageModel
             return NotFound();
         }
 
+        IReadOnlyList<int> roster = SelectedPilotIds();
+        if (roster.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Choose at least the primary pilot.");
+        }
+
+        if (await fleet.CompNoExistsAsync(ClassId, CompNo))
+        {
+            ModelState.AddModelError(nameof(CompNo),
+                "A glider with this comp number already exists in this class.");
+        }
+
         if (!ModelState.IsValid)
         {
             await LoadOptionsAsync();
             return Page();
         }
 
-        await entries.CreateAsync(new CompetitionEntry
+        CompetitionEntry entry = await entries.CreateAsync(new CompetitionEntry
         {
             CompetitionClassId = ClassId,
-            GliderId = GliderId,
-            PilotId = PilotId,
-            P2PilotId = P2PilotId,
+            Glider = new Glider
+            {
+                CompetitionClassId = ClassId,
+                CompNo = CompNo,
+                Type = Type,
+                Registration = Registration,
+                Handicap = Handicap,
+            },
+            Pilots = roster
+                .Select((pilotId, order) => new EntryPilot { PilotId = pilotId, Order = order })
+                .ToList(),
         });
 
         TempData["Flash"] = "Entry created.";
-        return RedirectToPage("Index", new { classId = ClassId });
+        return RedirectToPage("Edit", new { id = entry.Id });
+    }
+
+    /// <summary>Distinct, in-order pilot ids from the slots, dropping blanks/dupes.</summary>
+    private IReadOnlyList<int> SelectedPilotIds()
+    {
+        var seen = new HashSet<int>();
+        var ordered = new List<int>();
+        foreach (int? id in PilotIds)
+        {
+            if (id is int pid && pid > 0 && seen.Add(pid))
+            {
+                ordered.Add(pid);
+            }
+        }
+
+        return ordered;
     }
 
     private async System.Threading.Tasks.Task LoadOptionsAsync()
     {
-        var gliders = await entries.AvailableGlidersAsync(ClassId);
-        GliderOptions = new SelectList(
-            gliders.Select(g => new { g.Id, Label = $"{g.CompNo} — {g.Type}" }),
-            "Id", "Label");
-
-        var allPilots = await pilots.ListAsync();
-        PilotOptions = new SelectList(allPilots, "Id", "Name");
+        Pilots = await pilots.ListAsync();
     }
 }

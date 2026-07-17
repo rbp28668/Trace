@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Trace.Data;
@@ -11,9 +12,11 @@ using Trace.Data;
 namespace Trace.Data.Migrations
 {
     [DbContext(typeof(TraceDbContext))]
-    partial class TraceDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260717133557_EntryPilotRosterAndDayP2")]
+    partial class EntryPilotRosterAndDayP2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -192,46 +195,6 @@ namespace Trace.Data.Migrations
                         .HasFilter("\"Active\" = true");
 
                     b.ToTable("Tasks");
-                });
-
-            modelBuilder.Entity("Trace.Data.Entities.CompetitionWaypoint", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Code")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int>("CompetitionId")
-                        .HasColumnType("integer");
-
-                    b.Property<double>("ElevationM")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("Latitude")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("Longitude")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int>("Style")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompetitionId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("CompetitionWaypoints");
                 });
 
             modelBuilder.Entity("Trace.Data.Entities.Day", b =>
@@ -610,17 +573,6 @@ namespace Trace.Data.Migrations
                     b.Navigation("Day");
                 });
 
-            modelBuilder.Entity("Trace.Data.Entities.CompetitionWaypoint", b =>
-                {
-                    b.HasOne("Trace.Data.Entities.Competition", "Competition")
-                        .WithMany("Waypoints")
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Competition");
-                });
-
             modelBuilder.Entity("Trace.Data.Entities.Day", b =>
                 {
                     b.HasOne("Trace.Data.Entities.Competition", "Competition")
@@ -760,8 +712,6 @@ namespace Trace.Data.Migrations
                     b.Navigation("Classes");
 
                     b.Navigation("Days");
-
-                    b.Navigation("Waypoints");
                 });
 
             modelBuilder.Entity("Trace.Data.Entities.CompetitionClass", b =>

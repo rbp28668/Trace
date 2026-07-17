@@ -34,14 +34,25 @@ public class PlanningService
     public PlanningService(TraceDbContext db) => this.db = db;
 
     /// <summary>
-    /// Optimises the task's barrels against its class fleet and the competition's
-    /// reference cruise speed, storing <c>DRefKm</c>/<c>TRefSec</c> and one
-    /// <see cref="BarrelRadius"/> row per (handicap, turnpoint).
+    /// A computed (but not yet persisted) plan: the task, its course, the optimiser
+    /// output and the reference cruise speed. Shared by <see cref="PlanAsync"/> and
+    /// the task-sheet export so both see identical per-handicap figures.
     /// </summary>
-    public async Task<PlanResult> PlanAsync(int taskId)
+    public sealed record PlanComputation(
+        CompetitionTask Task, Course Course, FleetPlan Plan, double VRefCruKmh);
+
+    /// <summary>
+    /// Loads a task and runs the optimiser against its class fleet without
+    /// persisting anything. Returns null if the task doesn't exist; throws if the
+    /// class has no gliders.
+    /// </summary>
+    public async Task<PlanComputation?> ComputePlanAsync(int taskId)
     {
-        CompetitionTask task = await LoadTaskAsync(taskId)
-            ?? throw new InvalidOperationException($"Task {taskId} not found.");
+        CompetitionTask? task = await LoadTaskAsync(taskId);
+        if (task is null)
+        {
+            return null;
+        }
 
         double vRefCru = await db.CompetitionClasses
             .Where(cc => cc.Id == task.CompetitionClassId)
@@ -67,6 +78,21 @@ public class PlanningService
             WindDirection = task.WindDirDeg ?? 0.0,
         };
         FleetPlan plan = optimizer.Optimize(course, geometry, fleet, href);
+        return new PlanComputation(task, course, plan, vRefCru);
+    }
+
+    /// <summary>
+    /// Optimises the task's barrels against its class fleet and the competition's
+    /// reference cruise speed, storing <c>DRefKm</c>/<c>TRefSec</c> and one
+    /// <see cref="BarrelRadius"/> row per (handicap, turnpoint).
+    /// </summary>
+    public async Task<PlanResult> PlanAsync(int taskId)
+    {
+        PlanComputation computed = await ComputePlanAsync(taskId)
+            ?? throw new InvalidOperationException($"Task {taskId} not found.");
+        CompetitionTask task = computed.Task;
+        FleetPlan plan = computed.Plan;
+        double href = plan.ReferenceHandicap;
 
         // Persist reference metrics and the per-handicap radii. One row per
         // distinct handicap × turnpoint index (gliders sharing a handicap share
@@ -212,6 +238,46 @@ public class PlanningService
             ? $"{task.Name} — H{hh.ToString("0.#", CultureInfo.InvariantCulture)}"
             : task.Name;
         return TaskDiagram.Render(course, title, radii);
+    }
+
+    /// <summary>
+    /// Builds an editable .docx task sheet for a planned task. Returns null if the
+    /// task doesn't exist or hasn't been planned (no stored barrels), so the caller
+    /// can direct the user to run the planner first.
+    /// </summary>
+    public async Task<byte[]?> ExportTaskSheetDocxAsync(int taskId)
+    {
+        bool planned = await db.BarrelRadii.AnyAsync(b => b.CompetitionTaskId == taskId);
+        if (!planned)
+        {
+            return null;
+        }
+
+        PlanComputation? computed = await ComputePlanAsync(taskId);
+        if (computed is null)
+        {
+            return null;
+        }
+
+        DateOnly date = computed.Task.Day?.Date ?? default;
+        return TaskSheetDocx.Build(computed, computed.Task.Name, date);
+    }
+
+    /// <summary>
+    /// Renders a diagram from in-memory turnpoints (the task as currently edited,
+    /// not yet saved), using the source-zone barrels ("as set"). Returns null if
+    /// there are fewer than two points. No database access.
+    /// </summary>
+    public string? RenderDiagramForTurnpoints(string title, IReadOnlyList<Turnpoint> turnpoints)
+    {
+        if (turnpoints.Count < 2)
+        {
+            return null;
+        }
+
+        var task = new CompetitionTask { Name = title, Turnpoints = turnpoints.ToList() };
+        Course course = PlanningMapper.ToCourse(task);
+        return TaskDiagram.Render(course, string.IsNullOrWhiteSpace(title) ? "Task" : title, null);
     }
 
     private Task<CompetitionTask?> LoadTaskAsync(int taskId) =>

@@ -5,7 +5,7 @@
 }
 
 <h1>Competitions &amp; classes</h1>
-<p class="text-muted">Add, edit and delete competitions and their classes here. Use the buttons on each competition to manage its days, fleet, tasks and scoring.</p>
+<p class="text-muted">Add, edit and delete competitions and their classes here. Use the buttons on each competition to manage its days, entries, tasks and scoring.</p>
 
 @if (!Model.Competitions.Any() && Model.EditCompetition != 0)
 {
@@ -66,6 +66,7 @@
                     </div>
                     <div class="text-end">
                         <a asp-page="/Days/Index" asp-route-competitionId="@c.Id" class="btn btn-sm btn-outline-secondary">Days</a>
+                        <a asp-page="/Waypoints/Index" asp-route-competitionId="@c.Id" class="btn btn-sm btn-outline-secondary">Waypoints</a>
                         <a asp-page="Index" asp-route-editCompetition="@c.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
                         @if (!c.IsActive)
                         {
@@ -116,11 +117,10 @@
                             <td>@cc.Name</td>
                             <td class="text-end">@cc.VRefCruKmh</td>
                             <td class="text-end">
-                                <a asp-page="/Gliders/Index" asp-route-classId="@cc.Id" class="btn btn-sm btn-outline-secondary">Fleet</a>
                                 <a asp-page="/Entries/Index" asp-route-classId="@cc.Id" class="btn btn-sm btn-outline-secondary">Entries</a>
                                 <a asp-page="Index" asp-route-editClass="@cc.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
                                 <form method="post" asp-page-handler="DeleteClass" asp-route-id="@cc.Id" class="d-inline"
-                                      onsubmit="return confirm('Delete this class and all its gliders, entries and tasks?');">
+                                      onsubmit="return confirm('Delete this class and all its entries and tasks?');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                 </form>
                             </td>
