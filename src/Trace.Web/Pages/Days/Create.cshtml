@@ -1,0 +1,28 @@
+@page
+@model Trace.Web.Pages.Days.CreateModel
+@{
+    ViewData["Title"] = "Add day";
+}
+
+<h1>Add day — @Model.Competition!.Name</h1>
+
+<form method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <input type="hidden" asp-for="CompetitionId" />
+    <div class="mb-3">
+        <label asp-for="DayNo" class="form-label"></label>
+        <input asp-for="DayNo" class="form-control" />
+        <span asp-validation-for="DayNo" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Date" class="form-label"></label>
+        <input asp-for="Date" class="form-control" />
+        <span asp-validation-for="Date" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Add</button>
+    <a asp-page="Index" asp-route-competitionId="@Model.CompetitionId" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

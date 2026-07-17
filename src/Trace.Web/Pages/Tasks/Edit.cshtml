@@ -1,0 +1,177 @@
+@page "{id:int}"
+@model Trace.Web.Pages.Tasks.EditModel
+@{
+    ViewData["Title"] = "Edit task";
+}
+
+<h1>Edit task</h1>
+
+<form method="post">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <input type="hidden" asp-for="Id" />
+
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <label asp-for="Name" class="form-label"></label>
+            <input asp-for="Name" class="form-control" />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+        <div class="col-md-2 mb-3">
+            <label asp-for="TaskType" class="form-label"></label>
+            <select asp-for="TaskType" class="form-select">
+                <option>A</option><option>B</option><option>C</option>
+            </select>
+        </div>
+    </div>
+
+    <fieldset class="border rounded p-3 mb-3">
+        <legend class="h6">Planning inputs</legend>
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label asp-for="WindDirDeg" class="form-label"></label>
+                <input asp-for="WindDirDeg" class="form-control" />
+            </div>
+            <div class="col-md-4 mb-3">
+                <label asp-for="WindSpeedKmh" class="form-label"></label>
+                <input asp-for="WindSpeedKmh" class="form-control" />
+            </div>
+            <div class="col-md-4 mb-3">
+                <label asp-for="RefHandicap" class="form-label"></label>
+                <input asp-for="RefHandicap" class="form-control" />
+            </div>
+        </div>
+        @if (Model.DRefKm is not null)
+        {
+            <p class="text-muted mb-2">
+                Planned: D<sub>Ref</sub> = @Model.DRefKm?.ToString("F1") km,
+                T<sub>Ref</sub> = @Model.TRefSec?.ToString("F0") s
+            </p>
+        }
+        <button type="submit" asp-page-handler="Plan" class="btn btn-outline-primary btn-sm">Run planner</button>
+        @if (Model.PlannedHandicaps.Any())
+        {
+            <span class="ms-2">Export:</span>
+            @foreach (var h in Model.PlannedHandicaps)
+            {
+                <button type="submit" asp-page-handler="Export" asp-route-handicap100="@((int)Math.Round(h * 100))"
+                        class="btn btn-outline-secondary btn-sm">H@(h.ToString("0.#")).cup</button>
+            }
+        }
+    </fieldset>
+
+    <h2 class="h5">Turnpoints</h2>
+    <table class="table table-sm" id="tpTable">
+        <thead>
+            <tr>
+                <th>#</th><th>Waypoint</th><th>Lat</th><th>Lon</th>
+                <th>R1 (km)</th><th>A1 (°)</th><th>R2 (km)</th>
+                <th>Line</th><th>Chk</th><th></th>
+            </tr>
+        </thead>
+        <tbody id="tpBody">
+        @for (int i = 0; i < Model.Turnpoints.Count; i++)
+        {
+            <tr>
+                <td class="idx">@(i)</td>
+                <td>
+                    <input type="hidden" name="Turnpoints[@i].Style" value="@Model.Turnpoints[i].Style" />
+                    <input name="Turnpoints[@i].Waypoint" value="@Model.Turnpoints[i].Waypoint" class="form-control form-control-sm" />
+                </td>
+                <td><input name="Turnpoints[@i].Latitude" value="@Model.Turnpoints[i].Latitude" class="form-control form-control-sm" style="width:8rem" /></td>
+                <td><input name="Turnpoints[@i].Longitude" value="@Model.Turnpoints[i].Longitude" class="form-control form-control-sm" style="width:8rem" /></td>
+                <td><input name="Turnpoints[@i].Radius1" value="@Model.Turnpoints[i].Radius1" class="form-control form-control-sm" style="width:6rem" /></td>
+                <td><input name="Turnpoints[@i].Angle1" value="@Model.Turnpoints[i].Angle1" class="form-control form-control-sm" style="width:5rem" /></td>
+                <td><input name="Turnpoints[@i].Radius2" value="@Model.Turnpoints[i].Radius2" class="form-control form-control-sm" style="width:6rem" /></td>
+                <td><input type="checkbox" name="Turnpoints[@i].IsLine" value="true" @(Model.Turnpoints[i].IsLine ? "checked" : "") /></td>
+                <td><input type="checkbox" name="Turnpoints[@i].IsCheckpoint" value="true" @(Model.Turnpoints[i].IsCheckpoint ? "checked" : "") /></td>
+                <td><button type="button" class="btn btn-sm btn-outline-danger removeRow">×</button></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    <p><button type="button" class="btn btn-outline-secondary btn-sm" id="addRow">Add turnpoint</button></p>
+
+    <button type="submit" class="btn btn-primary">Save task</button>
+    <a asp-page="Index" asp-route-dayId="@Model.DayId" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Back</a>
+</form>
+
+<hr />
+<h2 class="h5">Task diagram</h2>
+<p class="text-muted">
+    The task as saved (sectors and barrels).
+    @if (Model.PlannedHandicaps.Any())
+    {
+        <text>Choose a handicap to see its optimised barrels.</text>
+    }
+    else
+    {
+        <text>Run the planner to see per-handicap barrels.</text>
+    }
+</p>
+
+@{
+    var diagramBase = Url.Page("Edit", "Diagram", new { id = Model.Id })!;
+}
+<div class="mb-2">
+    <label for="hcapSelect" class="form-label">Handicap:</label>
+    <select id="hcapSelect" class="form-select d-inline-block" style="width:auto;"
+            onchange="updateDiagram()">
+        <option value="">As set</option>
+        @foreach (var h in Model.PlannedHandicaps)
+        {
+            <option value="@((int)Math.Round(h * 100))">H@(h.ToString("0.#"))</option>
+        }
+    </select>
+</div>
+<div class="border rounded p-2 bg-white" style="overflow:auto;">
+    <img id="taskDiagram" src="@diagramBase" alt="Task diagram" style="max-width:100%;" />
+</div>
+
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Turnpoint rows use indexed names (Turnpoints[i].Field); after add/remove
+        // we renumber so the model binder sees a contiguous list.
+        function renumber() {
+            document.querySelectorAll('#tpBody tr').forEach((tr, i) => {
+                tr.querySelector('.idx').textContent = i;
+                tr.querySelectorAll('input').forEach(inp => {
+                    inp.name = inp.name.replace(/Turnpoints\[\d+\]/, 'Turnpoints[' + i + ']');
+                });
+            });
+        }
+        document.getElementById('addRow').addEventListener('click', () => {
+            const body = document.getElementById('tpBody');
+            const i = body.querySelectorAll('tr').length;
+            const tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td class="idx">' + i + '</td>' +
+                '<td><input type="hidden" name="Turnpoints[' + i + '].Style" value="1" />' +
+                '<input name="Turnpoints[' + i + '].Waypoint" class="form-control form-control-sm" /></td>' +
+                '<td><input name="Turnpoints[' + i + '].Latitude" value="0" class="form-control form-control-sm" style="width:8rem" /></td>' +
+                '<td><input name="Turnpoints[' + i + '].Longitude" value="0" class="form-control form-control-sm" style="width:8rem" /></td>' +
+                '<td><input name="Turnpoints[' + i + '].Radius1" value="0" class="form-control form-control-sm" style="width:6rem" /></td>' +
+                '<td><input name="Turnpoints[' + i + '].Angle1" value="180" class="form-control form-control-sm" style="width:5rem" /></td>' +
+                '<td><input name="Turnpoints[' + i + '].Radius2" value="0" class="form-control form-control-sm" style="width:6rem" /></td>' +
+                '<td><input type="checkbox" name="Turnpoints[' + i + '].IsLine" value="true" /></td>' +
+                '<td><input type="checkbox" name="Turnpoints[' + i + '].IsCheckpoint" value="true" /></td>' +
+                '<td><button type="button" class="btn btn-sm btn-outline-danger removeRow">×</button></td>';
+            body.appendChild(tr);
+        });
+        document.getElementById('tpBody').addEventListener('click', e => {
+            if (e.target.classList.contains('removeRow')) {
+                e.target.closest('tr').remove();
+                renumber();
+            }
+        });
+
+        // Task diagram: swap the SVG source when a handicap is chosen.
+        const diagramBase = "@Html.Raw(diagramBase)";
+        function updateDiagram() {
+            const h = document.getElementById('hcapSelect').value;
+            const url = h ? diagramBase + (diagramBase.includes('?') ? '&' : '?') + 'handicap100=' + h : diagramBase;
+            document.getElementById('taskDiagram').src = url;
+        }
+    </script>
+}

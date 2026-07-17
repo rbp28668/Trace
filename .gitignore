@@ -66,3 +66,6 @@ nunit-*.xml
 
 # VS Code
 .vscode/
+
+# Uploaded IGC logs (Trace.Web IGC storage root; keep out of the repo)
+src/Trace.Web/App_Data/

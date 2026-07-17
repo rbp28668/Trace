@@ -1,0 +1,73 @@
+@page
+@model Trace.Web.Pages.Gliders.ImportModel
+@{
+    ViewData["Title"] = "Import fleet";
+}
+
+<h1>Import fleet — @Model.Class!.Name</h1>
+
+<p class="text-muted">
+    Accepts either the fleet layout <code>Type, Registration, CompNumber, Handicap</code>
+    or the entrants layout <code>CompNumber, Pilot, Club, Type, Class, Handicap</code>.
+    Pilots named in the CSV are created and linked as entries.
+</p>
+
+@if (!Model.Preview.Any())
+{
+    <form method="post" asp-page-handler="Preview" enctype="multipart/form-data" class="col-md-8">
+        <div asp-validation-summary="All" class="text-danger"></div>
+        <input type="hidden" asp-for="ClassId" />
+        <div class="mb-3">
+            <label asp-for="Upload" class="form-label">Upload CSV file</label>
+            <input asp-for="Upload" type="file" accept=".csv,text/csv" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label asp-for="Csv" class="form-label">…or paste CSV</label>
+            <textarea asp-for="Csv" class="form-control" rows="8"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Preview</button>
+        <a asp-page="Index" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Cancel</a>
+    </form>
+}
+else
+{
+    <p>@Model.Preview.Count row(s) parsed.
+        Rows marked <span class="badge bg-warning text-dark">update</span> already exist and will be overwritten.</p>
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr>
+                <th>Comp No</th><th>Type</th><th>Registration</th>
+                <th class="text-end">Handicap</th><th>Pilot</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Preview)
+        {
+            <tr>
+                <td>@r.CompNo</td>
+                <td>@r.Type</td>
+                <td>@r.Registration</td>
+                <td class="text-end">@r.Handicap</td>
+                <td>@r.PilotName</td>
+                <td>
+                    @if (r.IsDuplicate)
+                    {
+                        <span class="badge bg-warning text-dark">update</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-success">new</span>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+
+    <form method="post" asp-page-handler="Commit">
+        <input type="hidden" asp-for="ClassId" />
+        <input type="hidden" asp-for="RowsJson" />
+        <button type="submit" class="btn btn-primary">Import @Model.Preview.Count row(s)</button>
+        <a asp-page="Import" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Start over</a>
+    </form>
+}

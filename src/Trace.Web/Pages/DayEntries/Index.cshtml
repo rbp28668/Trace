@@ -1,0 +1,125 @@
+@page
+@model Trace.Web.Pages.DayEntries.IndexModel
+@{
+    ViewData["Title"] = "Day entries & scoring";
+    var comp = Model.Class!.Competition!;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-page="/Competitions/Index">Competitions</a></li>
+        <li class="breadcrumb-item"><a asp-page="/Days/Index" asp-route-competitionId="@comp.Id">@comp.Name</a></li>
+        <li class="breadcrumb-item active">Day @Model.Day!.DayNo — @Model.Class.Name — Scoring</li>
+    </ol>
+</nav>
+
+<h1>Day @Model.Day.DayNo — @Model.Class.Name</h1>
+
+@if (Model.ActiveTask is null)
+{
+    <div class="alert alert-warning">
+        No active task for this class today.
+        <a asp-page="/Tasks/Index" asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" class="alert-link">Set one</a>
+        before scoring.
+    </div>
+}
+else
+{
+    <p class="text-muted">
+        Active task: <strong>@Model.ActiveTask.Name</strong> (@Model.ActiveTask.TaskType).
+        @if (Model.ActiveTask.DRefKm is not null)
+        {
+            <text>D<sub>Ref</sub> = @Model.ActiveTask.DRefKm?.ToString("F1") km.</text>
+        }
+        else
+        {
+            <span class="text-danger">Not yet planned — run the planner to enable scoring.</span>
+        }
+    </p>
+}
+
+<div class="mb-3">
+    <form method="post" asp-page-handler="Seed" asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" class="d-inline">
+        <button type="submit" class="btn btn-outline-primary">Add entries from class</button>
+    </form>
+    @if (Model.Entries.Any(e => e.Flight?.IgcFile is not null))
+    {
+        <form method="post" asp-page-handler="ScoreAll" asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" class="d-inline">
+            <button type="submit" class="btn btn-outline-success">Score all uploaded</button>
+        </form>
+    }
+</div>
+
+@if (!Model.Entries.Any())
+{
+    <div class="alert alert-info">No day entries yet. Add them from the class entries above.</div>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Glider</th><th>Pilot</th><th class="text-end">H</th>
+                <th>IGC</th><th>Result</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var e in Model.Entries)
+        {
+            <tr>
+                <td>@e.Glider!.CompNo</td>
+                <td>@e.Pilot!.Name</td>
+                <td class="text-end">@e.Glider!.Handicap</td>
+                <td>
+                    @if (e.Flight?.IgcFile is not null)
+                    {
+                        <span class="text-success" title="@e.Flight.IgcFile.FileName">✓ @e.Flight.IgcFile.FileName</span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </td>
+                <td>
+                    @if (e.Flight?.Speed is not null)
+                    {
+                        <span class="badge bg-success">@e.Flight.Speed?.ToString("F2") km/h</span>
+                        @if (e.Flight.Time is not null)
+                        {
+                            <span class="text-muted">@e.Flight.Time?.ToString(@"hh\:mm\:ss")</span>
+                        }
+                    }
+                    else if (e.Flight?.Distance is not null)
+                    {
+                        <span class="badge bg-warning text-dark">@e.Flight.Distance?.ToString("F1") km (landout)</span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">not scored</span>
+                    }
+                </td>
+                <td class="text-end">
+                    <form method="post" asp-page-handler="Upload" enctype="multipart/form-data"
+                          asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" asp-route-entryId="@e.Id"
+                          class="d-inline-flex align-items-center gap-1">
+                        <input type="file" name="igc" accept=".igc,text/plain" class="form-control form-control-sm" style="max-width: 16rem;" />
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">Upload</button>
+                    </form>
+                    @if (e.Flight?.IgcFile is not null)
+                    {
+                        <form method="post" asp-page-handler="Score"
+                              asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" asp-route-entryId="@e.Id" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-success">Score</button>
+                        </form>
+                    }
+                    <form method="post" asp-page-handler="Delete"
+                          asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" asp-route-entryId="@e.Id" class="d-inline"
+                          onsubmit="return confirm('Remove this day entry?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

@@ -24,6 +24,12 @@ Two command-line tools over a shared library that implement the requirements in
   speed for finishers, handicapped achieved distance for land-outs, plus an
   airspace-infringement scan.
 
+There is also a **data-management web app** (`Trace.Data` + `Trace.Web`) built on
+top of the same `Trace.Core` engines — see [`data-app-plan.md`](data-app-plan.md)
+for its full design and milestone log. It manages competitions, classes, gliders,
+pilots, days and tasks in PostgreSQL and drives the Planner/Scorer engines
+in-process; the two CLIs above continue to work standalone and unchanged.
+
 ## 2. Solution layout
 
 ```
@@ -41,8 +47,18 @@ src/
   Trace.Planner/   task-optimisation executable
   Trace.Scorer/    scoring executable (legacy IGC dump kept as --dump)
   Trace.Tests/     xUnit tests (84)
+  Trace.Data/      EF Core (Npgsql) persistence: entities, DbContext, migrations,
+                   services, and entity⇆Trace.Core mappers (Mapping/)
+  Trace.Web/       ASP.NET Core Razor Pages data-management app (no SPA)
   Trace.sln
 ```
+
+`Trace.Data`/`Trace.Web` are the web app (see [`data-app-plan.md`](data-app-plan.md)).
+They reference `Trace.Core` and reuse its engines via a mapping layer; the
+Planner/Scorer executables are untouched. Note the DHT anchor **`VRefCru` is a
+per-`CompetitionClass` field** in the web app's schema (each class fleet has its
+own H=100 cruise speed) — the same free input the CLIs take as `--vref`
+(≈90 for Cloud Rally; see §9).
 
 .NET 10, C#, `Nullable` + `ImplicitUsings` enabled. Internally: distances in km,
 speeds km/h, angles degrees (radians only inside trig). Coordinate convention

@@ -1,0 +1,53 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<h1>Dashboard</h1>
+
+@if (Model.Active is null)
+{
+    <div class="alert alert-warning">
+        No active competition.
+        <a asp-page="/Competitions/Index" class="alert-link">Choose or create one</a>.
+    </div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="card-title h4">
+                @Model.Active.Name
+                <span class="badge bg-success">Active</span>
+            </h2>
+            <p class="card-text text-muted mb-1">@Model.Active.Site</p>
+            <p class="card-text text-muted">
+                @Model.Active.StartDate.ToString("yyyy-MM-dd") – @Model.Active.EndDate.ToString("yyyy-MM-dd")
+            </p>
+            <a asp-page="/Competitions/Index" class="btn btn-outline-primary btn-sm">Manage competitions &amp; classes</a>
+            <a asp-page="/Days/Index" asp-route-competitionId="@Model.Active.Id" class="btn btn-outline-secondary btn-sm">Days</a>
+        </div>
+    </div>
+
+    <h2 class="h5">Classes</h2>
+    @if (!Model.Classes.Any())
+    {
+        <p class="text-muted">No classes defined yet.</p>
+    }
+    else
+    {
+        <ul class="list-group">
+        @foreach (var cc in Model.Classes)
+        {
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>@cc.Name <span class="text-muted">· V<sub>RefCru</sub> @cc.VRefCruKmh km/h</span></span>
+                <span>
+                    <a asp-page="/Gliders/Index" asp-route-classId="@cc.Id" class="btn btn-sm btn-outline-secondary">Fleet</a>
+                    <a asp-page="/Entries/Index" asp-route-classId="@cc.Id" class="btn btn-sm btn-outline-secondary">Entries</a>
+                </span>
+            </li>
+        }
+        </ul>
+    }
+}

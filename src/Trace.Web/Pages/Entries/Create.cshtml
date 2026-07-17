@@ -1,0 +1,46 @@
+@page
+@model Trace.Web.Pages.Entries.CreateModel
+@{
+    ViewData["Title"] = "New entry";
+}
+
+<h1>New entry — @Model.Class!.Name</h1>
+
+@if (!Model.GliderOptions.Any())
+{
+    <div class="alert alert-warning">
+        No unentered gliders left in this class.
+        <a asp-page="/Gliders/Create" asp-route-classId="@Model.ClassId" class="alert-link">Add a glider</a> first.
+    </div>
+}
+
+<form method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <input type="hidden" asp-for="ClassId" />
+    <div class="mb-3">
+        <label asp-for="GliderId" class="form-label">Glider</label>
+        <select asp-for="GliderId" asp-items="Model.GliderOptions" class="form-select">
+            <option value="">— choose —</option>
+        </select>
+        <span asp-validation-for="GliderId" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="PilotId" class="form-label">Pilot</label>
+        <select asp-for="PilotId" asp-items="Model.PilotOptions" class="form-select">
+            <option value="">— choose —</option>
+        </select>
+        <span asp-validation-for="PilotId" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="P2PilotId" class="form-label">P2 (optional)</label>
+        <select asp-for="P2PilotId" asp-items="Model.PilotOptions" class="form-select">
+            <option value="">— none —</option>
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Create</button>
+    <a asp-page="Index" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

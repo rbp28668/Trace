@@ -1,0 +1,81 @@
+@page "{id:int}"
+@model Trace.Web.Pages.Gliders.EditModel
+@{
+    ViewData["Title"] = "Edit glider";
+}
+
+<h1>Edit glider</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <form method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="Id" />
+            <div class="mb-3">
+                <label asp-for="CompNo" class="form-label"></label>
+                <input asp-for="CompNo" class="form-control" />
+                <span asp-validation-for="CompNo" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Type" class="form-label"></label>
+                <input asp-for="Type" class="form-control" />
+                <span asp-validation-for="Type" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Registration" class="form-label"></label>
+                <input asp-for="Registration" class="form-control" />
+                <span asp-validation-for="Registration" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Handicap" class="form-label"></label>
+                <input asp-for="Handicap" class="form-control" />
+                <span asp-validation-for="Handicap" class="text-danger"></span>
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a asp-page="Index" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Back to fleet</a>
+        </form>
+    </div>
+
+    <div class="col-md-6">
+        <h2 class="h5">Loggers</h2>
+        @if (!Model.Loggers.Any())
+        {
+            <p class="text-muted">No loggers recorded.</p>
+        }
+        else
+        {
+            <ul class="list-group mb-3">
+            @foreach (var l in Model.Loggers)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>@l.LoggerId @(string.IsNullOrEmpty(l.Type) ? "" : $"({l.Type})")</span>
+                    <form method="post" asp-page-handler="RemoveLogger" asp-route-loggerId="@l.Id" class="d-inline">
+                        <input type="hidden" asp-for="Id" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                    </form>
+                </li>
+            }
+            </ul>
+        }
+
+        <form method="post" asp-page-handler="AddLogger">
+            <input type="hidden" asp-for="Id" />
+            <div class="row g-2">
+                <div class="col">
+                    <input asp-for="LoggerId" class="form-control" placeholder="Logger id" />
+                </div>
+                <div class="col">
+                    <input asp-for="LoggerType" class="form-control" placeholder="Type (optional)" />
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-outline-primary">Add logger</button>
+                </div>
+            </div>
+            <span asp-validation-for="LoggerId" class="text-danger"></span>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

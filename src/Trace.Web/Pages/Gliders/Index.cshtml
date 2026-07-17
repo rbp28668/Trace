@@ -1,0 +1,62 @@
+@page
+@model Trace.Web.Pages.Gliders.IndexModel
+@{
+    ViewData["Title"] = "Fleet";
+    var comp = Model.Class!.Competition!;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-page="/Competitions/Index">Competitions</a></li>
+        <li class="breadcrumb-item"><a asp-page="/Competitions/Index">@comp.Name</a></li>
+        <li class="breadcrumb-item active">@Model.Class.Name — Fleet</li>
+    </ol>
+</nav>
+
+<h1>Fleet — @Model.Class.Name</h1>
+
+<p>
+    <a asp-page="Create" asp-route-classId="@Model.Class.Id" class="btn btn-primary">Add glider</a>
+    <a asp-page="Import" asp-route-classId="@Model.Class.Id" class="btn btn-outline-primary">Import CSV</a>
+</p>
+
+@if (!Model.Gliders.Any())
+{
+    <div class="alert alert-info">No gliders yet. Add one or import a fleet/entrants CSV.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Comp No</th>
+                <th>Type</th>
+                <th>Registration</th>
+                <th class="text-end">Handicap</th>
+                <th>Loggers</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var g in Model.Gliders)
+        {
+            <tr>
+                <td>@g.CompNo</td>
+                <td>@g.Type</td>
+                <td>@g.Registration</td>
+                <td class="text-end">@g.Handicap</td>
+                <td>@(g.Loggers.Count == 0 ? "—" : string.Join(", ", g.Loggers.Select(l => l.LoggerId)))</td>
+                <td class="text-end">
+                    <a asp-page="Edit" asp-route-id="@g.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <form method="post" asp-page-handler="Delete" asp-route-id="@g.Id"
+                          asp-route-classId="@Model.Class.Id" class="d-inline"
+                          onsubmit="return confirm('Delete this glider?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    <p class="text-muted">@Model.Gliders.Count glider(s).</p>
+}

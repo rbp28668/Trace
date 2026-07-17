@@ -1,0 +1,53 @@
+@page
+@model Trace.Web.Pages.Entries.IndexModel
+@{
+    ViewData["Title"] = "Entries";
+    var comp = Model.Class!.Competition!;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-page="/Competitions/Index">Competitions</a></li>
+        <li class="breadcrumb-item"><a asp-page="/Competitions/Index">@comp.Name</a></li>
+        <li class="breadcrumb-item active">@Model.Class.Name — Entries</li>
+    </ol>
+</nav>
+
+<h1>Entries — @Model.Class.Name</h1>
+
+<p>
+    <a asp-page="Create" asp-route-classId="@Model.Class.Id" class="btn btn-primary">New entry</a>
+    <a asp-page="/Gliders/Index" asp-route-classId="@Model.Class.Id" class="btn btn-outline-secondary">Fleet</a>
+</p>
+
+@if (!Model.Entries.Any())
+{
+    <div class="alert alert-info">No entries yet. Pair a pilot with a glider to create one.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Glider</th><th>Type</th><th>Pilot</th><th>P2</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var en in Model.Entries)
+        {
+            <tr>
+                <td>@en.Glider!.CompNo</td>
+                <td>@en.Glider!.Type</td>
+                <td>@en.Pilot!.Name</td>
+                <td>@en.P2Pilot?.Name</td>
+                <td class="text-end">
+                    <a asp-page="Edit" asp-route-id="@en.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <form method="post" asp-page-handler="Delete" asp-route-id="@en.Id"
+                          asp-route-classId="@Model.Class.Id" class="d-inline"
+                          onsubmit="return confirm('Remove this entry?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

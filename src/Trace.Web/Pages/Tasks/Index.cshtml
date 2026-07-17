@@ -1,0 +1,73 @@
+@page
+@model Trace.Web.Pages.Tasks.IndexModel
+@{
+    ViewData["Title"] = "Tasks";
+    var comp = Model.Class!.Competition!;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-page="/Competitions/Index">Competitions</a></li>
+        <li class="breadcrumb-item"><a asp-page="/Days/Index" asp-route-competitionId="@comp.Id">@comp.Name</a></li>
+        <li class="breadcrumb-item active">Day @Model.Day!.DayNo — @Model.Class.Name</li>
+    </ol>
+</nav>
+
+<h1>Tasks — Day @Model.Day.DayNo, @Model.Class.Name</h1>
+<p class="text-muted">@Model.Day.Date.ToString("yyyy-MM-dd")</p>
+
+<p>
+    <a asp-page="Create" asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" class="btn btn-primary">New task</a>
+    <a asp-page="Import" asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" class="btn btn-outline-primary">Import .cup</a>
+    @if (Model.Tasks.Any(t => t.Active))
+    {
+        <form method="post" asp-page-handler="Scrub" asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" class="d-inline"
+              onsubmit="return confirm('Scrub the day for this class? No task will be active.');">
+            <button type="submit" class="btn btn-outline-warning">Scrub day</button>
+        </form>
+    }
+</p>
+
+@if (!Model.Tasks.Any())
+{
+    <div class="alert alert-info">No tasks yet. Create one or import a .cup task.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Type</th><th>Name</th><th class="text-end">Turnpoints</th><th>Active</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var t in Model.Tasks)
+        {
+            <tr>
+                <td>@t.TaskType</td>
+                <td>@t.Name</td>
+                <td class="text-end">@t.Turnpoints.Count</td>
+                <td>
+                    @if (t.Active)
+                    {
+                        <span class="badge bg-success">Active</span>
+                    }
+                </td>
+                <td class="text-end">
+                    <a asp-page="Edit" asp-route-id="@t.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    @if (!t.Active)
+                    {
+                        <form method="post" asp-page-handler="Activate" asp-route-id="@t.Id"
+                              asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-success">Make active</button>
+                        </form>
+                    }
+                    <form method="post" asp-page-handler="Delete" asp-route-id="@t.Id"
+                          asp-route-dayId="@Model.Day.Id" asp-route-classId="@Model.Class.Id" class="d-inline"
+                          onsubmit="return confirm('Delete this task?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

@@ -1,0 +1,63 @@
+@page
+@model Trace.Web.Pages.Days.IndexModel
+@{
+    ViewData["Title"] = "Days";
+    var comp = Model.Competition!;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-page="/Competitions/Index">Competitions</a></li>
+        <li class="breadcrumb-item"><a asp-page="/Competitions/Index">@comp.Name</a></li>
+        <li class="breadcrumb-item active">Days</li>
+    </ol>
+</nav>
+
+<h1>Days — @comp.Name</h1>
+
+<p><a asp-page="Create" asp-route-competitionId="@comp.Id" class="btn btn-primary">Add day</a></p>
+
+@if (!Model.Days.Any())
+{
+    <div class="alert alert-info">No days yet.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Day</th><th>Date</th><th>Tasks by class</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var d in Model.Days)
+        {
+            <tr>
+                <td>Day @d.DayNo</td>
+                <td>@d.Date.ToString("yyyy-MM-dd")</td>
+                <td>
+                    @foreach (var cc in Model.Classes)
+                    {
+                        <span class="btn-group btn-group-sm mb-1 me-1" role="group">
+                            <a asp-page="/Tasks/Index" asp-route-dayId="@d.Id" asp-route-classId="@cc.Id"
+                               class="btn btn-outline-secondary">@cc.Name tasks</a>
+                            <a asp-page="/DayEntries/Index" asp-route-dayId="@d.Id" asp-route-classId="@cc.Id"
+                               class="btn btn-outline-secondary">scoring</a>
+                        </span>
+                    }
+                    @if (!Model.Classes.Any())
+                    {
+                        <span class="text-muted">No classes defined.</span>
+                    }
+                </td>
+                <td class="text-end">
+                    <a asp-page="Edit" asp-route-id="@d.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <form method="post" asp-page-handler="Delete" asp-route-id="@d.Id"
+                          asp-route-competitionId="@comp.Id" class="d-inline"
+                          onsubmit="return confirm('Delete this day and its tasks?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

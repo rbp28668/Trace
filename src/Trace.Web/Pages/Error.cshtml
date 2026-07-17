@@ -1,0 +1,17 @@
+@page
+@model ErrorModel
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<h1 class="text-danger">@Model.Title</h1>
+<p class="lead">@Model.Message</p>
+
+@if (Model.ShowRequestId)
+{
+    <p class="text-muted">
+        <strong>Request ID:</strong> <code>@Model.RequestId</code>
+    </p>
+}
+
+<a asp-page="/Index" class="btn btn-primary">Back to dashboard</a>

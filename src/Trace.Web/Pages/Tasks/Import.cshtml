@@ -1,0 +1,69 @@
+@page
+@model Trace.Web.Pages.Tasks.ImportModel
+@{
+    ViewData["Title"] = "Import task";
+}
+
+<h1>Import .cup task — Day @Model.Day!.DayNo, @Model.Class!.Name</h1>
+
+@if (Model.Preview is null)
+{
+    <form method="post" asp-page-handler="Preview" enctype="multipart/form-data" class="col-md-8">
+        <div asp-validation-summary="All" class="text-danger"></div>
+        <input type="hidden" asp-for="DayId" />
+        <input type="hidden" asp-for="ClassId" />
+        <div class="row">
+            <div class="col-md-3 mb-3">
+                <label asp-for="TaskType" class="form-label">Task type</label>
+                <select asp-for="TaskType" class="form-select">
+                    <option>A</option><option>B</option><option>C</option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label asp-for="Upload" class="form-label">Upload .cup file</label>
+            <input asp-for="Upload" type="file" accept=".cup,text/plain" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label asp-for="Cup" class="form-label">…or paste .cup text</label>
+            <textarea asp-for="Cup" class="form-control" rows="8"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Preview</button>
+        <a asp-page="Index" asp-route-dayId="@Model.DayId" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Cancel</a>
+    </form>
+}
+else
+{
+    <p><strong>@Model.Preview.Description</strong> — @Model.Preview.Turnpoints.Count turnpoint(s).</p>
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr><th>#</th><th>Waypoint</th><th>Lat</th><th>Lon</th><th>R1 (km)</th><th>A1</th><th>R2 (km)</th><th>Line</th><th>Chk</th></tr>
+        </thead>
+        <tbody>
+        @for (int i = 0; i < Model.Preview.Turnpoints.Count; i++)
+        {
+            var tp = Model.Preview.Turnpoints[i];
+            <tr>
+                <td>@i</td>
+                <td>@tp.Waypoint</td>
+                <td>@tp.Latitude.ToString("F4")</td>
+                <td>@tp.Longitude.ToString("F4")</td>
+                <td>@tp.Radius1.ToString("F2")</td>
+                <td>@tp.Angle1.ToString("F0")</td>
+                <td>@tp.Radius2.ToString("F2")</td>
+                <td>@(tp.IsLine ? "✓" : "")</td>
+                <td>@(tp.IsCheckpoint ? "✓" : "")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+
+    <form method="post" asp-page-handler="Commit">
+        <input type="hidden" asp-for="DayId" />
+        <input type="hidden" asp-for="ClassId" />
+        <input type="hidden" asp-for="TaskType" />
+        <input type="hidden" asp-for="TaskJson" />
+        <button type="submit" class="btn btn-primary">Import this task</button>
+        <a asp-page="Import" asp-route-dayId="@Model.DayId" asp-route-classId="@Model.ClassId" class="btn btn-secondary">Start over</a>
+    </form>
+}

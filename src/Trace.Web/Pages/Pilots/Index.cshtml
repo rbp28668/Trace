@@ -1,0 +1,38 @@
+@page
+@model Trace.Web.Pages.Pilots.IndexModel
+@{
+    ViewData["Title"] = "Pilots";
+}
+
+<h1>Pilots</h1>
+
+<p><a asp-page="Create" class="btn btn-primary">New pilot</a></p>
+
+@if (!Model.Pilots.Any())
+{
+    <div class="alert alert-info">No pilots yet. Add one, or import a fleet CSV that names pilots.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Name</th><th>Account No</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var p in Model.Pilots)
+        {
+            <tr>
+                <td>@p.Name</td>
+                <td>@p.AccountNo</td>
+                <td class="text-end">
+                    <a asp-page="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <form method="post" asp-page-handler="Delete" asp-route-id="@p.Id" class="d-inline"
+                          onsubmit="return confirm('Delete this pilot?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

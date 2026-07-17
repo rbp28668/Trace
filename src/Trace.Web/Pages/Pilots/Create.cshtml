@@ -1,0 +1,27 @@
+@page
+@model Trace.Web.Pages.Pilots.CreateModel
+@{
+    ViewData["Title"] = "New pilot";
+}
+
+<h1>New pilot</h1>
+
+<form method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="AccountNo" class="form-label"></label>
+        <input asp-for="AccountNo" class="form-control" />
+        <span asp-validation-for="AccountNo" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Create</button>
+    <a asp-page="Index" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
